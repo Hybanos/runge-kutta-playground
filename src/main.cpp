@@ -30,18 +30,25 @@ void test() {
 int main() {
     // test();
     // exit(0);
-    tree_manager tm(2);
-    // for (int i = 0; i < tm.pool.size(); i++) {
-    //     std::cout << to_string(tm.pool, i) << std::endl;
-    //     // print(tm.pool, i);
-    // }
-    std::cout << to_string(tm.pool, 0) << std::endl;
-    std::cout << to_string(tm.pool, 1) << std::endl;
+    int order = 4;
+    tree_manager tm(order);
+
+    int acc = 0;
+    for (int i = 0; i < order + 1; i++) {
+        std::cout << "ORDER " << i << std::endl;
+        for (int j = 0; j < A000081(i); j++) {
+            std::cout << to_string(tm.pool, acc) << std::endl;
+            print(tm.pool, acc);
+            acc += i;
+        }
+    }
+    // std::cout << to_string(tm.pool, 0) << std::endl;
+    // std::cout << to_string(tm.pool, 1) << std::endl;
     // std::cout << to_string(tm.pool, 3) << std::endl;
     // std::cout << to_string(tm.pool, 6) << std::endl;
 
-    print(tm.pool, 0);
-    print(tm.pool, 1);
+    // print(tm.pool, 0);
+    // print(tm.pool, 1);
     // print(tm.pool, 3);
     // print(tm.pool, 6);
 

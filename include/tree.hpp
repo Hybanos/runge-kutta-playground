@@ -14,6 +14,7 @@ struct node {
 class tree_manager {
     private:
         std::vector<uint64_t> indices;
+        std::vector<uint64_t> nodes_accumulated;
         uint64_t pool_size = 0;
         uint64_t node_top = 0;
         std::unordered_set<std::string> hashes;

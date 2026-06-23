@@ -18,10 +18,14 @@ tree_manager::tree_manager(uint32_t max_order) {
     indices.resize(max_order+2);
     indices[0] = 0;
     indices[1] = 0;
+    // nodes_accumulated.push_back(0);
+    // nodes_accumulated.push_back(0);
     for (int32_t i = 1; i < max_order + 1; i++) {
         uint64_t tree_count = A000081(i);
         pool_size += tree_count * i;
-        indices[i+1] = indices[i] + tree_count;
+        // indices[i+1] = indices[i] + tree_count;
+        indices[i+1] = indices[i] + tree_count * i;
+        // nodes_accumulated.push_back(nodes_accumulated[i] + tree_count * i);
     }
     pool.resize(pool_size);
     for (uint64_t i = 0; i < pool_size; i++) {
@@ -42,19 +46,22 @@ void tree_manager::gen(uint32_t n) {
     gen(n-1);
 
     // loop over trees of order - 1
-    for (uint32_t i = indices[n-1]; i < indices[n]; i++) {
+    for (uint32_t i = indices[n-1]; i < indices[n]; i+=n) {
         std::cout << "n: " << n << "  i: " << i << std::endl;
         // std::cout << to_string(pool, i) << " " << order(pool, i) << std::endl;
+
         // for each leaf, copy tree while adding a new leaf at the n-th node
         for (uint32_t j = 0; j < n-1; j++) {
             uint64_t t = node_top;
             copy_tree(i, t);
             add_leaf(t, j);
-            std::string hash = to_string(pool, j);
+            sort(pool, t);
+            std::string hash = to_string(pool, t);
+            // std::cout << hash << std::endl;
             if (hashes.count(hash)) {
                 std::cout << "hash found ! " << hash << std::endl;
                 node_top -= n;
-                for (uint32_t k = 0; k < n; k++) pool[t+k] = {-1, -1};
+                for (uint32_t k = 0; k < n; k++) pool[t+k] = {-1, 0};
             } else {
                 hashes.emplace(hash);
             }
@@ -73,16 +80,17 @@ void tree_manager::copy_tree(uint64_t from, uint64_t to) {
 void tree_manager::add_leaf(uint64_t t, uint32_t parent) {
     uint32_t o = order(pool, t);
 
-    node n = pool[t+parent];
+    node &n = pool[t+parent];
     if (n.child_count == 0) {
-        n.first_child = node_top;
+        n.first_child = node_top - t - parent;
     } else {
-        uint64_t to_shift = n.first_child + n.child_count;
-        memcpy(&pool[to_shift+1], &pool[to_shift], MAX_TREE_ORDER * sizeof(node));
-        for (uint64_t i = t+parent; i < to_shift + MAX_TREE_ORDER; i++) {
-            if (pool[i].first_child <= -1) {
-                pool[i].first_child += 1;
-            }
+        // that's where the fuckup happens
+        for (uint64_t i = MAX_TREE_ORDER; i > n.first_child + n.child_count; i--) {
+            pool[t + i] = pool[t + i - 1];
+        }
+        pool[node_top] = {-1, 0};
+        for (uint64_t i = t; i < node_top; i++) {
+            if (pool[i].first_child >= node_top) pool[i].first_child++;
         }
     }
     n.child_count++;
