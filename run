@@ -1,0 +1,11 @@
+#!/usr/bin/bash
+
+build=""
+
+if [ -f /usr/bin/ninja ]; then
+    build="-G Ninja"
+fi
+
+cmake -B build $build -DCMAKE_BUILD_TYPE=Release || exit
+cmake --build build || exit
+build/src/main || exit

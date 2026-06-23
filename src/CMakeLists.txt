@@ -1,6 +1,8 @@
 add_executable(main)
 
 target_sources(main PRIVATE 
+    tree.cpp
+
     main.cpp
 )
 
