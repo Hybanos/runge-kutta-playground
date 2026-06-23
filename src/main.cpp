@@ -11,16 +11,20 @@ void test() {
         pool[i].child_count = 0;
     }
 
-    pool[0].first_child = 1;
-    pool[0].child_count = 2;
-    pool[2].first_child = 1;
-    pool[2].child_count = 1;
+    uint64_t off = 5;
 
-    std::cout << to_string(pool, 0) << std::endl;
-    sort(pool, 0);
-    std::cout << to_string(pool, 0) << std::endl;
-    std::cout << order(pool, 0) << std::endl;
-    std::cout << fact(pool, 0) << std::endl;
+    pool[off + 0].first_child = 1;
+    pool[off + 0].child_count = 3;
+    pool[off + 2].first_child = 2;
+    pool[off + 2].child_count = 1;
+    pool[off + 3].first_child = 2;
+    pool[off + 3].child_count = 2;
+
+    std::cout << to_string(pool, off) << std::endl;
+    sort(pool, off);
+    std::cout << to_string(pool, off) << std::endl;
+    std::cout << order(pool, off) << std::endl;
+    std::cout << fact(pool, off) << std::endl;
 }
 
 int main() {

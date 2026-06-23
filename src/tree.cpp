@@ -126,7 +126,12 @@ void sort(std::vector<node> &pool, uint64_t n) {
             uint64_t c2 = n + t.first_child + j;
 
             if (order(pool, c1) < order(pool, c2)) {
-                std::swap(pool[c1], pool[c2]);
+                uint64_t tmp_fc = pool[c1].first_child;
+                int32_t tmp_cc = pool[c1].child_count;
+                pool[c1].first_child = j + pool[c2].first_child - i;
+                pool[c1].child_count = pool[c2].child_count;
+                pool[c2].first_child = i + tmp_fc - j;
+                pool[c2].child_count = tmp_cc;
             }
         }
     }
