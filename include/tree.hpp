@@ -35,6 +35,6 @@ uint64_t A000081(uint32_t n);
 std::string to_string(std::vector<node> &pool, uint64_t n);
 uint32_t order(std::vector<node> &pool, uint64_t n);
 int64_t fact(std::vector<node> &pool, uint64_t n);
-void sort(std::vector<node> &pool, uint64_t n);
+void sort(std::vector<node> &pool, uint64_t n, bool rec=false);
 
 void print(std::vector<node> &pool, uint64_t n);

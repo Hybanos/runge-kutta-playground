@@ -13,16 +13,35 @@ void test() {
 
     uint64_t off = 5;
 
+    // pool[off + 0].first_child = 1;
+    // pool[off + 0].child_count = 3;
+    // pool[off + 2].first_child = 2;
+    // pool[off + 2].child_count = 1;
+    // pool[off + 3].first_child = 2;
+    // pool[off + 3].child_count = 2;
+
+    // std::cout << to_string(pool, off) << std::endl;
+    // sort(pool, off);
+    // std::cout << to_string(pool, off) << std::endl;
+    // std::cout << order(pool, off) << std::endl;
+    // std::cout << fact(pool, off) << std::endl;
+
     pool[off + 0].first_child = 1;
-    pool[off + 0].child_count = 3;
-    pool[off + 2].first_child = 2;
-    pool[off + 2].child_count = 1;
-    pool[off + 3].first_child = 2;
-    pool[off + 3].child_count = 2;
+    pool[off + 0].child_count = 1;
+    pool[off + 1].first_child = 1;
+    pool[off + 1].child_count = 2;
+    pool[off + 2].first_child = -1;
+    pool[off + 2].child_count = 0;
+    pool[off + 3].first_child = 1;
+    pool[off + 3].child_count = 1;
+    pool[off + 4].first_child = -1;
+    pool[off + 4].child_count = 0;
 
     std::cout << to_string(pool, off) << std::endl;
+    print(pool, off);
     sort(pool, off);
     std::cout << to_string(pool, off) << std::endl;
+    print(pool, off);
     std::cout << order(pool, off) << std::endl;
     std::cout << fact(pool, off) << std::endl;
 }
@@ -30,7 +49,7 @@ void test() {
 int main() {
     // test();
     // exit(0);
-    int order = 4;
+    int order = 5;
     tree_manager tm(order);
 
     int acc = 0;

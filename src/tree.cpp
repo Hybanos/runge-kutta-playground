@@ -27,7 +27,7 @@ tree_manager::tree_manager(uint32_t max_order) {
         indices[i+1] = indices[i] + tree_count * i;
         // nodes_accumulated.push_back(nodes_accumulated[i] + tree_count * i);
     }
-    pool.resize(pool_size);
+    pool.resize(pool_size * 2);
     for (uint64_t i = 0; i < pool_size; i++) {
         pool[i].first_child = -1;
         pool[i].child_count = 0;
@@ -46,15 +46,17 @@ void tree_manager::gen(uint32_t n) {
     gen(n-1);
 
     // loop over trees of order - 1
-    for (uint32_t i = indices[n-1]; i < indices[n]; i+=n) {
+    for (uint32_t i = indices[n-1]; i < indices[n]; i+=n-1) {
         std::cout << "n: " << n << "  i: " << i << std::endl;
         // std::cout << to_string(pool, i) << " " << order(pool, i) << std::endl;
 
         // for each leaf, copy tree while adding a new leaf at the n-th node
         for (uint32_t j = 0; j < n-1; j++) {
             uint64_t t = node_top;
+            std::cout << "new tree at " << t;
             copy_tree(i, t);
             add_leaf(t, j);
+            std::cout << " " << to_string(pool, t) << std::endl;
             sort(pool, t);
             std::string hash = to_string(pool, t);
             // std::cout << hash << std::endl;
@@ -125,8 +127,14 @@ int64_t fact(std::vector<node> &pool, uint64_t n) {
     return out;
 }
 
-void sort(std::vector<node> &pool, uint64_t n) {
+void sort(std::vector<node> &pool, uint64_t n, bool rec) {
     node t = pool[n];
+
+    std::string presort = to_string(pool, n);
+
+    for (int32_t i = 0; i < t.child_count; i++) {
+        sort(pool, n+i+1, true);
+    }
 
     for (int32_t i = 0; i < t.child_count-1; i++) {
         for (int32_t j = i+1; j < t.child_count; j++) {
@@ -134,6 +142,7 @@ void sort(std::vector<node> &pool, uint64_t n) {
             uint64_t c2 = n + t.first_child + j;
 
             if (order(pool, c1) < order(pool, c2)) {
+                // std::cout << c1 << " " << c2 << std::endl;
                 uint64_t tmp_fc = pool[c1].first_child;
                 int32_t tmp_cc = pool[c1].child_count;
                 pool[c1].first_child = j + pool[c2].first_child - i;
@@ -143,12 +152,14 @@ void sort(std::vector<node> &pool, uint64_t n) {
             }
         }
     }
+
+    if (!rec) std::cout << "sorting " << presort << " to " << to_string(pool, n) << std::endl;
 }
 
 void print(std::vector<node> &pool, uint64_t n) {
     node t = pool[n];
 
-    std::cout << n << ":" << t.child_count << "|" << t.first_child << std::endl;
+    std::cout << n << ":" << t.child_count << "|" << t.first_child << "  order: " << order(pool, n) << std::endl;
     for (int32_t i = 0; i < t.child_count; i++) {
         print(pool, n + t.first_child + i);
     }
