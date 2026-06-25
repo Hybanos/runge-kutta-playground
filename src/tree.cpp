@@ -126,8 +126,8 @@ uint32_t order(std::vector<node> &pool, uint64_t n) {
 int64_t fact(std::vector<node> &pool, uint64_t n) {
     node t = pool[n];
     int64_t out = order(pool, n);
-    for (int32_t i = 0; i < t.child_count; i++) {
-        out *= order(pool, n + t.first_child + i);
+    for (int32_t i = out-1; i > 0; i--) {
+        out *= order(pool, n + i);
     }
     return out;
 }
@@ -164,8 +164,8 @@ void sort(std::vector<node> &pool, uint64_t n, bool rec) {
 
 void print(std::vector<node> &pool, uint64_t n) {
     for (uint64_t i = 0; i < order(pool, n); i++) {
-        std::cout << n+i << ":" << pool[n+i].child_count 
-                << "|" << pool[n+i].first_child 
+        std::cout << n+i << ":" << (int) pool[n+i].child_count 
+                << "|" << (int) pool[n+i].first_child 
                 << "  order: " << order(pool, n+i)
                 << "  fact: " << fact(pool, n+i)
                 << std::endl;
