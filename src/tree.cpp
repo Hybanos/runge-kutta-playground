@@ -27,7 +27,8 @@ tree_manager::tree_manager(uint32_t max_order) {
         indices[i+1] = indices[i] + tree_count * i;
         // nodes_accumulated.push_back(nodes_accumulated[i] + tree_count * i);
     }
-    pool.resize(pool_size * 2);
+    // pool_size *= 2;
+    pool.resize(pool_size);
     for (uint64_t i = 0; i < pool_size; i++) {
         pool[i].first_child = -1;
         pool[i].child_count = 0;
@@ -54,9 +55,15 @@ void tree_manager::gen(uint32_t n) {
         for (uint32_t j = 0; j < n-1; j++) {
             uint64_t t = node_top;
             std::cout << "new tree at " << t;
-            copy_tree(i, t);
-            add_leaf(t, j);
-            std::cout << " " << to_string(pool, t) << std::endl;
+            copy_tree(pool, i, t);
+            node_top += n-1;
+            std::cout << " copy : " << to_string(pool, t);
+            add_leaf(pool, node_top, t, j);
+            node_top++;
+            std::cout << " added : " << to_string(pool, t) << " based on " << to_string(pool, i) << std::endl;
+            print(pool, i);
+            std::cout << std::endl;
+            print(pool, t);
             sort(pool, t);
             std::string hash = to_string(pool, t);
             // std::cout << hash << std::endl;
@@ -71,32 +78,30 @@ void tree_manager::gen(uint32_t n) {
     }
 }
 
-void tree_manager::copy_tree(uint64_t from, uint64_t to) {
+void copy_tree(std::vector<node> &pool, uint64_t from, uint64_t to) {
     for (uint32_t i = 0; i < order(pool, from); i++) {
         pool[to + i] = pool[from + i];
-        node_top++;
     }
 }
 
-// absolutely does fuck up the next tree in the pool
-void tree_manager::add_leaf(uint64_t t, uint32_t parent) {
+void add_leaf(std::vector<node> &pool, uint64_t nt, uint64_t t, uint32_t parent) {
     uint32_t o = order(pool, t);
 
     node &n = pool[t+parent];
     if (n.child_count == 0) {
-        n.first_child = node_top - t - parent;
+        n.first_child = nt - t - parent;
     } else {
-        // that's where the fuckup happens
-        for (uint64_t i = MAX_TREE_ORDER; i > n.first_child + n.child_count; i--) {
-            pool[t + i] = pool[t + i - 1];
+        uint64_t added_index = t + parent + n.first_child + n.child_count;
+        // std::cout << added_index << std::endl;
+        for (uint64_t i = t + o + 1; i > added_index; i--) {
+            pool[i] = pool[i - 1];
         }
-        pool[node_top] = {-1, 0};
-        for (uint64_t i = t; i < node_top; i++) {
-            if (pool[i].first_child >= node_top) pool[i].first_child++;
+        pool[added_index] = {-1, 0};
+        for (uint64_t i = t; i < added_index; i++) {
+            if (i + pool[i].first_child >= added_index) pool[i].first_child++;
         }
     }
     n.child_count++;
-    node_top++;
 }
 
 std::string to_string(std::vector<node> &pool, uint64_t n) {
