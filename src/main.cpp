@@ -77,14 +77,14 @@ int main() {
     // test();
     // test2();
     // exit(0);
-    int order = 6;
+    int order = 15;
     tree_manager tm(order);
 
     int acc = 0;
     for (int i = 0; i < order + 1; i++) {
         std::cout << "ORDER " << i << std::endl;
-        for (int j = 0; j < A000081(i); j++) {
-            std::cout << acc <<  " " << to_string(tm.pool, acc) << std::endl;
+        for (int j = 0; j < A000081(i); j+=1) {
+            if (!j%100) std::cout << acc <<  " " << to_string(tm.pool, acc) << std::endl;
             // print(tm.pool, acc);
             acc += i;
         }

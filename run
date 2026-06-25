@@ -8,4 +8,4 @@ fi
 
 cmake -B build $build -DCMAKE_BUILD_TYPE=Release || exit
 cmake --build build || exit
-build/src/main || exit
+time build/src/main || exit

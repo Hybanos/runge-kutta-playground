@@ -5,10 +5,11 @@
 #include <unordered_set>
 
 #define MAX_TREE_ORDER 20
+#define NODE_INIT {0, 0}
 
 struct node {
-    int64_t first_child;
-    int32_t child_count;
+    uint8_t first_child;
+    uint8_t child_count;
 };
 
 class tree_manager {
