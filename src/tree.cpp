@@ -154,10 +154,20 @@ void sort(pool &p, uint64_t n, bool rec) {
     // if (!rec) std::cout << "sorting " << presort << " to " << to_string(pool, n) << std::endl;
 }
 
+void label_tree(pool &p, uint64_t n) {
+    uint32_t o = order(p, n);
+
+    char label = 'i';
+    for (uint32_t i = 0; i < o; i++) {
+        if (p[n+i].child_count) p[n+i].label = label++;
+    }
+}
+
 void print(pool &p, uint64_t n) {
     for (uint64_t i = 0; i < order(p, n); i++) {
         std::cout << n+i << ":" << (int) p[n+i].child_count 
                 << "|" << (int) p[n+i].first_child 
+                << " " << p[n+i].label 
                 << "  order: " << order(p, n+i)
                 << "  fact: " << fact(p, n+i)
                 << std::endl;

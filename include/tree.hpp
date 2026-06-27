@@ -11,7 +11,7 @@
 struct node {
     uint8_t first_child;
     uint8_t child_count;
-    char label;
+    char label = '\0';
 };
 
 class pool {
@@ -43,5 +43,6 @@ void sort(pool &p, uint64_t n, bool rec=false);
 
 void copy_tree(pool &p, uint64_t from, uint64_t to);
 void add_leaf(pool &p, uint64_t nt, uint64_t t, uint32_t parent);
+void label_tree(pool &p, uint64_t n);
 
 void print(pool &p, uint64_t n);

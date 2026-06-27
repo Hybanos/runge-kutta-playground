@@ -70,6 +70,7 @@ int main() {
         std::cout << "ORDER " << i << std::endl;
         for (int j = 0; j < A000081(i); j+=1) {
             if (!(j%1)) std::cout << acc <<  " " << to_string(p, acc) << std::endl;
+            label_tree(p, acc);
             print(p, acc);
             acc += i;
         }
