@@ -47,17 +47,17 @@ void pool::_gen(uint32_t n) {
         for (uint32_t j = 0; j < n-1; j++) {
             uint64_t t = node_top;
             // std::cout << "new tree at " << t;
-            copy_tree(*this, i, t);
+            copy_tree(i, t);
             node_top += n-1;
             // std::cout << " copy : " << to_string(pool, t);
-            add_leaf(*this, node_top, t, j);
+            add_leaf(node_top, t, j);
             node_top++;
             // std::cout << " added : " << to_string(pool, t) << " based on " << to_string(pool, i) << std::endl;
             // print(pool, i);
             // std::cout << std::endl;
             // print(pool, t);
-            sort(*this, t);
-            std::string hash = to_string(*this, t);
+            sort(t);
+            std::string hash = to_string(t);
             // std::cout << hash << std::endl;
             if (hashes.count(hash)) {
                 // std::cout << "hash found ! " << hash << std::endl;
@@ -70,67 +70,67 @@ void pool::_gen(uint32_t n) {
     }
 }
 
-void copy_tree(pool &p, uint64_t from, uint64_t to) {
-    for (uint32_t i = 0; i < order(p, from); i++) {
-        p[to + i] = p[from + i];
+void pool::copy_tree(uint64_t from, uint64_t to) {
+    for (uint32_t i = 0; i < order(from); i++) {
+        _pool[to + i] = _pool[from + i];
     }
 }
 
-void add_leaf(pool &p, uint64_t nt, uint64_t t, uint32_t parent) {
-    uint32_t o = order(p, t);
+void pool::add_leaf(uint64_t nt, uint64_t t, uint32_t parent) {
+    uint32_t o = order(t);
 
-    node &n = p[t+parent];
+    node &n = _pool[t+parent];
     if (n.child_count == 0) {
         n.first_child = nt - t - parent;
     } else {
         uint64_t added_index = t + parent + n.first_child + n.child_count;
         // std::cout << added_index << std::endl;
         for (uint64_t i = t + o + 1; i > added_index; i--) {
-            p[i] = p[i - 1];
+            _pool[i] = _pool[i - 1];
         }
-        p[added_index] = NODE_INIT;
+        _pool[added_index] = NODE_INIT;
         for (uint64_t i = t; i < added_index; i++) {
-            if (i + p[i].first_child >= added_index) p[i].first_child++;
+            if (i + _pool[i].first_child >= added_index) _pool[i].first_child++;
         }
     }
     n.child_count++;
 }
 
-std::string to_string(pool &p, uint64_t n) {
-    node t = p[n];
+std::string pool::to_string(uint64_t n) {
+    node t = _pool[n];
     if (t.child_count == 0) return ".";
     std::string out = "[";
     for (int32_t i = 0; i < t.child_count; i++) {
-        out += to_string(p, n + t.first_child + i);
+        out += to_string(n + t.first_child + i);
     }
     return out + "]";
 }
 
-uint32_t order(pool &p, uint64_t n) {
-    node t = p[n];
+uint32_t pool::order(uint64_t n) {
+    node t = _pool[n];
     uint32_t out = 1;
     for (int64_t i = 0; i < t.child_count; i++) {
-        out += order(p, n + t.first_child + i);
+        out += order(n + t.first_child + i);
     }
     return out;
 }
 
-int64_t fact(pool &p, uint64_t n) {
-    node t = p[n];
-    int64_t out = order(p, n);
+int64_t pool::fact(uint64_t n) {
+    node t = _pool[n];
+    int64_t out = order(n);
     for (int32_t i = out-1; i > 0; i--) {
-        out *= order(p, n + i);
+        out *= order(n + i);
     }
     return out;
 }
 
-void sort(pool &p, uint64_t n, bool rec) {
-    node t = p[n];
+void pool::sort(uint64_t n, bool rec) {
+    node t = _pool[n];
 
-    std::string presort = to_string(p, n);
+    std::string presort = to_string(n);
 
     for (int32_t i = 0; i < t.child_count; i++) {
-        sort(p, n + p[n].first_child + i);
+        sort(n + _pool[n].first_child + i);
     }
 
     for (int32_t i = 0; i < t.child_count-1; i++) {
@@ -139,14 +139,14 @@ void sort(pool &p, uint64_t n, bool rec) {
             uint64_t c2 = n + t.first_child + j;
 
             // there has to be a better way than sorting on strings
-            if (to_string(p, c1) < to_string(p, c2)) {
+            if (to_string(c1) < to_string(c2)) {
                 // std::cout << c1 << " " << c2 << std::endl;
-                uint64_t tmp_fc = p[c1].first_child;
-                int32_t tmp_cc = p[c1].child_count;
-                p[c1].first_child = j + p[c2].first_child - i;
-                p[c1].child_count = p[c2].child_count;
-                p[c2].first_child = i + tmp_fc - j;
-                p[c2].child_count = tmp_cc;
+                uint64_t tmp_fc = _pool[c1].first_child;
+                int32_t tmp_cc = _pool[c1].child_count;
+                _pool[c1].first_child = j + _pool[c2].first_child - i;
+                _pool[c1].child_count = _pool[c2].child_count;
+                _pool[c2].first_child = i + tmp_fc - j;
+                _pool[c2].child_count = tmp_cc;
             }
         }
     }
@@ -154,22 +154,22 @@ void sort(pool &p, uint64_t n, bool rec) {
     // if (!rec) std::cout << "sorting " << presort << " to " << to_string(pool, n) << std::endl;
 }
 
-void label_tree(pool &p, uint64_t n) {
-    uint32_t o = order(p, n);
+void pool::label_tree(uint64_t n) {
+    uint32_t o = order(n);
 
     char label = 'i';
     for (uint32_t i = 0; i < o; i++) {
-        if (p[n+i].child_count) p[n+i].label = label++;
+        if (_pool[n+i].child_count) _pool[n+i].label = label++;
     }
 }
 
-void print(pool &p, uint64_t n) {
-    for (uint64_t i = 0; i < order(p, n); i++) {
-        std::cout << n+i << ":" << (int) p[n+i].child_count 
-                << "|" << (int) p[n+i].first_child 
-                << " " << p[n+i].label 
-                << "  order: " << order(p, n+i)
-                << "  fact: " << fact(p, n+i)
+void pool::print(uint64_t n) {
+    for (uint64_t i = 0; i < order(n); i++) {
+        std::cout << n+i << ":" << (int) _pool[n+i].child_count 
+                << "|" << (int) _pool[n+i].first_child 
+                << " " << _pool[n+i].label 
+                << "  order: " << order(n+i)
+                << "  fact: " << fact(n+i)
                 << std::endl;
     }
 }

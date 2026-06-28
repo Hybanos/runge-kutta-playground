@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -7,6 +9,9 @@
 
 #define MAX_TREE_ORDER 20
 #define NODE_INIT {0, 0}
+
+// https://oeis.org/A000081
+uint64_t A000081(uint32_t n);
 
 struct node {
     uint8_t first_child;
@@ -31,18 +36,17 @@ class pool {
         uint64_t size() {return _pool.size();}
 
         node &operator[](uint64_t n) {return _pool[n];};
+
+    std::string to_string(uint64_t n);
+    uint32_t order(uint64_t n);
+    int64_t fact(uint64_t n);
+    void sort(uint64_t n, bool rec=false);
+
+    void copy_tree(uint64_t from, uint64_t to);
+    void add_leaf( uint64_t nt, uint64_t t, uint32_t parent);
+    void label_tree( uint64_t n);
+
+    void print(uint64_t n);
 };
 
-// https://oeis.org/A000081
-uint64_t A000081(uint32_t n);
 
-std::string to_string(pool &p, uint64_t n);
-uint32_t order(pool &p, uint64_t n);
-int64_t fact(pool &p, uint64_t n);
-void sort(pool &p, uint64_t n, bool rec=false);
-
-void copy_tree(pool &p, uint64_t from, uint64_t to);
-void add_leaf(pool &p, uint64_t nt, uint64_t t, uint32_t parent);
-void label_tree(pool &p, uint64_t n);
-
-void print(pool &p, uint64_t n);

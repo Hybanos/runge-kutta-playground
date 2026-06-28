@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "tree.hpp"
+#include "combi.hpp"
 
 void test() {
     pool p(MAX_TREE_ORDER);
@@ -23,13 +24,13 @@ void test() {
     p[off + 4].first_child = -1;
     p[off + 4].child_count = 0;
 
-    std::cout << to_string(p, off) << std::endl;
-    print(p, off);
-    sort(p, off);
-    std::cout << to_string(p, off) << std::endl;
-    print(p, off);
-    std::cout << order(p, off) << std::endl;
-    std::cout << fact(p, off) << std::endl;
+    std::cout << p.to_string(off) << std::endl;
+    p.print(off);
+    p.sort(off);
+    std::cout << p.to_string(off) << std::endl;
+    p.print(off);
+    std::cout << p.order(off) << std::endl;
+    std::cout << p.fact(off) << std::endl;
 }
 
 void test2() {
@@ -47,21 +48,37 @@ void test2() {
     p[2].child_count = 1;
 
     uint64_t node_top = 4;
-    copy_tree(p, 0, node_top);
+    p.copy_tree(0, node_top);
     node_top += 4;
-    add_leaf(p, node_top, 4, 1);
-    std::cout << to_string(p, 0) << std::endl;
-    print(p, 0);
+    p.add_leaf(node_top, 4, 1);
+    std::cout << p.to_string(0) << std::endl;
+    p.print(0);
 
-    std::cout << to_string(p, 4) << std::endl;
-    print(p, 4);
+    std::cout << p.to_string(4) << std::endl;
+    p.print(4);
+}
+
+void comb() {
+    int n = 5;
+    int k = 4;
+    std::vector<int> v(k);
+
+    for (int i = 0; i < k; i++) {
+        v[i] = i;
+    }
+
+    for (auto it = permutations(v); !it.done(); ++it) {
+        for (int j = 0; j < k; j++) std::cout << (*it)[j] << " ";
+        std::cout << std::endl;
+    }
 }
 
 int main() {
     // test();
     // test2();
-    // exit(0);
-    int order = 6;
+    comb();
+    exit(0);
+    int order = 5;
     pool p;
     p.gen(order);
 
@@ -69,9 +86,9 @@ int main() {
     for (int i = 0; i < order + 1; i++) {
         std::cout << "ORDER " << i << std::endl;
         for (int j = 0; j < A000081(i); j+=1) {
-            if (!(j%1)) std::cout << acc <<  " " << to_string(p, acc) << std::endl;
-            label_tree(p, acc);
-            print(p, acc);
+            if (!(j%1)) std::cout << acc <<  " " << p.to_string(acc) << std::endl;
+            p.label_tree(acc);
+            p.print(acc);
             acc += i;
         }
     }
