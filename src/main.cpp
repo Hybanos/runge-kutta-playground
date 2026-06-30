@@ -59,15 +59,22 @@ void test2() {
 }
 
 void comb() {
-    int n = 5;
-    int k = 4;
-    std::vector<int> v(k);
+    int n = 4;
+    int k = 2;
+    std::vector<int> v(n);
 
-    for (int i = 0; i < k; i++) {
+    for (int i = 0; i < n; i++) {
         v[i] = i;
     }
 
     for (auto it = permutations(v); !it.done(); ++it) {
+        for (int j = 0; j < n; j++) std::cout << (*it)[j] << " ";
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+
+    auto it = k_permutations(k, v);
+    for (; !it.done(); ++it) {
         for (int j = 0; j < k; j++) std::cout << (*it)[j] << " ";
         std::cout << std::endl;
     }
