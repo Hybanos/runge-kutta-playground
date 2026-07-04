@@ -91,17 +91,14 @@ int main() {
         // test2();
         // comb();
         // exit(0);
-        // int order = 4;
-        // pool p;
-        // p.gen(order);
-        
-        // for (auto it = tree_iterator(p); !it.done(); ++it) {
-        //     std::cout << *it << " " << p.to_string(*it) << std::endl;
-        //     p.label_tree(*it);
-        //     phi(p, *it).print();
-        // }
 
-        build(4);
+        // build system of equations
+        equation_block equations = build_equation(10);
+        // build jacobian matrix
+        equation_block jacobin = build_jacobian(equations);
+
+        // while true:
+            // solve system
     }
     Kokkos::finalize();
 
