@@ -1,7 +1,10 @@
 #include <iostream>
 
+#include <Kokkos_Core.hpp>
+
 #include "tree.hpp"
 #include "combi.hpp"
+#include "equations.hpp"
 
 void test() {
     pool p(MAX_TREE_ORDER);
@@ -59,46 +62,48 @@ void test2() {
 }
 
 void comb() {
-    int n = 4;
-    int k = 2;
-    std::vector<int> v(n);
+    int n = 7;
+    int k = 1;
+    std::vector<uint8_t> v(n);
+    // std::vector<int> v(n);
 
     for (int i = 0; i < n; i++) {
         v[i] = i;
     }
 
     for (auto it = permutations(v); !it.done(); ++it) {
-        for (int j = 0; j < n; j++) std::cout << (*it)[j] << " ";
+        for (int j = 0; j < n; j++) std::cout << (int) (*it)[j] << " ";
         std::cout << std::endl;
     }
     std::cout << std::endl;
 
     auto it = k_permutations(k, v);
     for (; !it.done(); ++it) {
-        for (int j = 0; j < k; j++) std::cout << (*it)[j] << " ";
+        for (int j = 0; j < k; j++) std::cout << (int) (*it)[j] << " ";
         std::cout << std::endl;
     }
 }
 
 int main() {
-    // test();
-    // test2();
-    comb();
-    exit(0);
-    int order = 5;
-    pool p;
-    p.gen(order);
+    Kokkos::initialize();
+    {
+        // test();
+        // test2();
+        // comb();
+        // exit(0);
+        // int order = 4;
+        // pool p;
+        // p.gen(order);
+        
+        // for (auto it = tree_iterator(p); !it.done(); ++it) {
+        //     std::cout << *it << " " << p.to_string(*it) << std::endl;
+        //     p.label_tree(*it);
+        //     phi(p, *it).print();
+        // }
 
-    int acc = 0;
-    for (int i = 0; i < order + 1; i++) {
-        std::cout << "ORDER " << i << std::endl;
-        for (int j = 0; j < A000081(i); j+=1) {
-            if (!(j%1)) std::cout << acc <<  " " << p.to_string(acc) << std::endl;
-            p.label_tree(acc);
-            p.print(acc);
-            acc += i;
-        }
+        build(4);
     }
+    Kokkos::finalize();
 
     return 0;
 }

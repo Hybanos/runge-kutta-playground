@@ -70,6 +70,14 @@ void pool::_gen(uint32_t n) {
     }
 }
 
+uint64_t pool::count_trees() {
+    uint64_t out = 0;
+    for (auto it = tree_iterator(*this); !it.done(); ++it) {
+        out++; 
+    }
+    return out;
+}
+
 void pool::copy_tree(uint64_t from, uint64_t to) {
     for (uint32_t i = 0; i < order(from); i++) {
         _pool[to + i] = _pool[from + i];
@@ -158,7 +166,8 @@ void pool::label_tree(uint64_t n) {
     uint32_t o = order(n);
 
     char label = 'i';
-    for (uint32_t i = 0; i < o; i++) {
+    _pool[n].label = label++;
+    for (uint32_t i = 1; i < o; i++) {
         if (_pool[n+i].child_count) _pool[n+i].label = label++;
     }
 }

@@ -7,5 +7,6 @@ if [ -f /usr/bin/ninja ]; then
 fi
 
 cmake -B build $build -DCMAKE_BUILD_TYPE=Release || exit
+# cmake -B build $build -DCMAKE_BUILD_TYPE=Debug|| exit
 cmake --build build || exit
 time build/src/main || exit

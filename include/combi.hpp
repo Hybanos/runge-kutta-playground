@@ -9,7 +9,7 @@
 template<class T>
 class permutations {
     private:
-        std::vector<T> curr;
+        std::vector<T> &curr;
         std::vector<int> c;
         int i = 0;
 
@@ -29,10 +29,9 @@ class permutations {
         }
 
     public:
-        permutations(std::vector<T> &v) {
-            curr = v;
+        permutations(std::vector<T> &v) : curr{v} {
             c.resize(v.size());
-            for (int j = 0; j < v.size(); j++) {
+            for (uint64_t j = 0; j < v.size(); j++) {
                 c[j] = 0;
             }
             i = 1;
@@ -47,60 +46,43 @@ class permutations {
 template<class T>
 class k_permutations {
     private:
-        int i = 0;
-        int iter = 0;
-        int k;
-        int total;
+        uint64_t i = 0;
+        uint64_t iter = 0;
+        uint64_t k;
+        uint64_t total;
         std::vector<T> &v;
         std::vector<T> out;
         std::unordered_set<uint64_t> hashes;
-
-        std::vector<int> indices;
 
         uint64_t checksum() {
             uint64_t c = 0;
             for (int j = 0; j < k; j++) {
                 c += out[i * k + j];
                 c = c << 6 | c >> (64 - 6);
-                c ^= 0xFFFFFFFFFFFFFFFF;
+                c ^= ~static_cast<uint64_t>(0);
             }
             return c;
         }
 
         void gen() {
             for (auto it = permutations(v); !it.done(); ++it) {
-                for (int i = 0; i < k; i++) {
-                    indices[i] = i;
+
+                for (int n = 0; n < k; n++) out[i * k + n] = (*it)[n];
+                auto hash = checksum();
+                if (!hashes.contains(hash)) {
+                    hashes.emplace(hash);
+                    i++;
                 }
-                indices[k] = k;
-                indices[k+1] = 0;
 
-                while (true) {
-                    for (int n = 0; n < k; n++) out[i * k + n] = (*it)[indices[n]];
-
-                    // std::cout << out[i * k + 0] << " " << out[i * k + 1] << std::endl;
-
-                    uint64_t hash = checksum();
-                    if (!hashes.contains(hash)) {
-                        hashes.emplace(hash);
-                        i++;
-                    }
-                    int j = 0;
-                    while (indices[j]+1 == indices[j+1]) {
-                        indices[j] = j;
-                        j = j + 1;
-                    }
-                    if (j >= k) break;
-                    indices[j] = indices[j] + 1;
-                }
+                if (i == total) break;
             }
         }
 
     public:
         k_permutations(int _k, std::vector<T> &_v) : k{_k}, v{_v} {
             total = tgammal(v.size() + 1) / tgammal(v.size() - k + 1);
+            if (k == 1) total = v.size();
             out.resize(k * total);
-            indices.resize(k+2);
             gen();
             hashes.clear();
         }
