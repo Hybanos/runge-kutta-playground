@@ -14,6 +14,12 @@ struct equation_block {
     Kokkos::View<double *> facts;
 };
 
+struct jacobian_block {
+    Kokkos::View<uint8_t **> params;
+    Kokkos::View<uint32_t *> sizes;
+    Kokkos::View<uint32_t *> indexes;
+};
+
 struct factor {
     char type = 0;
     char label_1 = 0;
@@ -49,21 +55,52 @@ struct phi {
 // maps the butcher tableau factor to its slot in the linear array
 /*
     for order 4: 
-    b_0   b_1   b_2   b_3   c_1   c_2   c_3   a_21   a_31   a_32      0      1
+    b_0   b_1   b_2   b_3   c_1   c_2   c_3   a_21   a_31   a_32      1      0
       0     1     2     3     4     5     6      7      8      9     10     11
 */
-__inline__ uint8_t get_index(factor &f, uint8_t order) {
+__inline__ uint8_t get_index(factor &f, uint8_t stages) {
     if (f.type == 'b') 
         return f.label_1;
 
     if (f.type == 'c') 
-        return order + 
+        return stages + 
             f.label_1 - 1;
 
     if (f.type == 'a') 
-        return order + order - 1 + 
+        return stages + stages - 1 + 
             ((f.label_1-1) * (f.label_1 - 2)) / 2 + f.label_2 - 1;
+    
+    return stages+1;
 }
 
-equation_block build_equations(uint8_t order);
-equation_block build_jacobian(equation_block equations);
+__inline__ std::string get_factor(uint8_t index, uint8_t stages) {
+    uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
+    uint8_t zero_index = one_index + 1;
+
+    if (index == one_index) return "1";
+    if (index == zero_index) return "0";
+
+    if (index < stages) 
+        return "b_" + std::to_string((int) index);
+
+    if (index < stages + stages - 1)
+        return "c_" + std::to_string((int) index - stages + 1);
+   
+    uint8_t off = index - stages - stages + 1;
+    uint8_t label_1 = 0;
+    uint8_t label_2 = 0;
+    for (int i = 0; i < off; i++) {
+        label_2++;
+        if (label_2 == label_1 + 1) {
+            label_1++;
+            label_2 = 0;
+        }
+    }
+    return "a_" + std::to_string((int) label_1 + 2) + std::to_string((int) label_2 + 1);
+}
+
+equation_block build_equations(pool &p, uint8_t stages);
+jacobian_block build_jacobian(pool &p, uint8_t stages, equation_block &equations);
+
+void print_equations(uint8_t stages, equation_block equations);
+void print_jacobian(uint8_t stages, jacobian_block jacobian);

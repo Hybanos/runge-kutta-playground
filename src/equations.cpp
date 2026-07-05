@@ -1,24 +1,21 @@
 #include "equations.hpp"
 
-equation_block build_equations(uint8_t order) {
-    pool p;
-    p.gen(order);
+equation_block build_equations(pool &p, uint8_t stages) {
 
-    uint8_t zero_index = order + order - 1 + (order - 1) * (order - 2) / 2;
-    uint8_t  one_index = zero_index + 1;
+    uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
     uint64_t equation_count = p.count_trees();
 
+    std::vector<uint8_t> _factors;
     std::vector<uint32_t> _equation_sizes(equation_count);
     std::vector<uint32_t> _equation_indexes(equation_count);
-    std::vector<uint8_t> _factors;
     std::vector<double> _factorials(equation_count);
-
-    std::vector<uint8_t> label_values(order); 
-    for (int i = 0; i < order; i++) label_values[i] = i;
+// derivate product
+    std::vector<uint8_t> label_values(stages); 
+    for (int i = 0; i < stages; i++) label_values[i] = i;
 
     // cache all k-permutation we're gonna need (x25 banger speedup)
     std::vector<k_permutations<uint8_t>> perm_iterators;
-    for (int i = 0; i < order; i++) {perm_iterators.push_back(k_permutations(i, label_values));std::cout << "alloc done " << i << std::endl;}
+    for (int i = 0; i < stages; i++) {perm_iterators.push_back(k_permutations(i, label_values));std::cout << "alloc done " << i << std::endl;}
 
     uint64_t total_products = 0;
     uint64_t tree_i = 0;
@@ -34,14 +31,14 @@ equation_block build_equations(uint8_t order) {
         for (; !perm.done(); ++perm) {
             bool is_zero = false;
             // for (auto &f : _phi.factors) {
-            for (int i = 0; i < order; i++) {
+            for (int i = 0; i < stages; i++) {
                 if (i < _phi.factors.size()) {
                     factor f = _phi.factors[i];
                     if (f.type == 'a' && (*perm)[f.label_2 - 'i'] > (*perm)[f.label_1 - 'i']) is_zero = true; 
                     if (f.type == 'c' && (*perm)[f.label_1 - 'i'] == 0) is_zero = true;
 
                     factor f_perm = factor{f.type, (char) (*perm)[f.label_1 - 'i'], (char) (*perm)[f.label_2 - 'i']};
-                    uint8_t ind = get_index(f_perm, order);
+                    uint8_t ind = get_index(f_perm, stages);
 
                     // std::cout << f_perm.type << "_" << (int) f_perm.label_1 << "-" << (int) f_perm.label_2 << "\t" << (int) ind << std::endl;
 
@@ -51,7 +48,7 @@ equation_block build_equations(uint8_t order) {
                 }
             }
             if (!is_zero) local_products++;
-            else _factors.resize(_factors.size() - order);
+            else _factors.resize(_factors.size() - stages);
         }
         _equation_sizes[tree_i] = local_products;
         _equation_indexes[tree_i] = total_products;
@@ -71,12 +68,12 @@ equation_block build_equations(uint8_t order) {
     // std::cout << std::endl;
 
     // for (int i = 0; i < _factors.size(); i++) {
-    //     if (!(i%order) && i > 0) std::cout << std::endl;
+    //     if (!(i%stages) && i > 0) std::cout << std::endl;
     //     std::cout << (int) _factors[i] << " ";
     // }
 
     equation_block equations = {
-        .params = Kokkos::View<uint8_t **>("", _factors.size() / order, order),
+        .params = Kokkos::View<uint8_t **>("", _factors.size() / stages, stages),
         .sizes = Kokkos::View<uint32_t *>("", _equation_sizes.size()),
         .indexes = Kokkos::View<uint32_t *>("", _equation_indexes.size()),
         .facts = Kokkos::View<double *>("", _factorials.size()),
@@ -88,4 +85,111 @@ equation_block build_equations(uint8_t order) {
     std::memcpy(equations.facts.data(), _factorials.data(), _factorials.size() * sizeof(double));
 
     return equations;
+}
+
+jacobian_block build_jacobian(pool &p, uint8_t stages, equation_block &equations) {
+
+    uint8_t param_count = (stages - 1) / (stages - 2) / 2 + stages + stages - 1;
+    uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
+    uint8_t zero_index = one_index + 1;
+    uint64_t equation_count = p.count_trees();
+
+    std::vector<uint8_t> _factors;
+    std::vector<uint32_t> _equation_sizes(equation_count * param_count);
+    std::vector<uint32_t> _equation_indexes(equation_count * param_count);
+   
+    uint64_t total_products = 0;
+    uint64_t equation_i = 0;
+    for (int j = 0; j < param_count; j++) {
+        for (int i = 0; i < equations.sizes.size(); i++) {
+            uint32_t size = equations.sizes[i];
+            uint32_t index = equations.indexes[i];
+            uint64_t local_products = 0;
+            // derivate equation 
+            for (int k = 0; k < size; k += 1) {
+                bool factor_found = false;
+                // derivate product
+                for (int l = 0; l < stages; l++) {
+                    uint8_t prod = equations.params(index + k, l);
+                    if (prod == j && !factor_found) {
+                        _factors.push_back(one_index);
+                        factor_found = true;
+                    } else {
+                        _factors.push_back(prod); 
+                    }
+                }
+                
+                // if we didn't derivate yet, set product to 0
+                if (!factor_found) {
+                    _factors.resize(_factors.size() - stages);
+                } else {
+                    local_products++;
+                }
+            }
+            _equation_sizes[equation_i] = local_products;
+            _equation_indexes[equation_i] = total_products;
+            total_products += local_products;
+            equation_i++;
+        }
+    }
+
+    jacobian_block jacobian = {
+        .params = Kokkos::View<uint8_t **>("", _factors.size() / stages, stages),
+        .sizes = Kokkos::View<uint32_t *>("", _equation_sizes.size()),
+        .indexes = Kokkos::View<uint32_t *>("", _equation_indexes.size()),
+    };
+
+    std::memcpy(jacobian.params.data(), _factors.data(), _factors.size() * sizeof(uint8_t));
+    std::memcpy(jacobian.sizes.data(), _equation_sizes.data(), _equation_sizes.size() * sizeof(uint32_t));
+    std::memcpy(jacobian.indexes.data(), _equation_indexes.data(), _equation_indexes.size() * sizeof(uint32_t));
+
+    return jacobian;
+}
+
+void print_equations(uint8_t stages, equation_block equations) {
+    std::cout << "=== Equations ===" << std::endl;
+    for (int i = 0; i < equations.sizes.size(); i++) {
+        uint32_t size = equations.sizes[i];
+        uint32_t index = equations.indexes[i];
+
+        for (int k = 0; k < size; k += 1) {
+            for (int l = 0; l < stages; l++) {
+                uint8_t prod = equations.params(index + k, l);
+
+                std::cout << get_factor(prod, stages);
+                if (l < stages - 1) std::cout << "*";
+            }
+            if (k < size - 1) std::cout << " + ";
+            else std::cout << " - 1/" << equations.facts[i];
+        }
+        std::cout << std::endl;
+    }    
+}
+
+void print_jacobian(uint8_t stages, jacobian_block jacobian) {
+    uint8_t param_count = (stages - 1) / (stages - 2) / 2 + stages + stages - 1;
+    int derivation_param = -1;
+
+    std::cout << "=== Jacobian ===" << std::endl;
+    for (int i = 0; i < jacobian.sizes.size(); i++) {
+        uint32_t size = jacobian.sizes[i];
+        uint32_t index = jacobian.indexes[i];
+
+        if (i % (jacobian.sizes.size() / param_count) == 0) {
+            derivation_param++;
+            std::cout << "derivating over " + get_factor(derivation_param, stages) << ":" << std::endl;
+        }
+
+        for (int k = 0; k < size; k += 1) {
+            for (int l = 0; l < stages; l++) {
+                uint8_t prod = jacobian.params(index + k, l);
+
+                std::cout << get_factor(prod, stages);
+                if (l < stages - 1) std::cout << "*";
+            }
+            if (k < size - 1) std::cout << " + ";
+        }
+        if (size == 0) std::cout << "0";
+        std::cout << std::endl;
+    }    
 }

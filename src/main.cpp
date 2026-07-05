@@ -92,10 +92,23 @@ int main() {
         // comb();
         // exit(0);
 
+        // generate trees
+        uint8_t stages = 4;
+        pool p;
+        p.gen(stages);
+
         // build system of equations
-        equation_block equations = build_equation(10);
+        equation_block equations = build_equations(p, stages);
         // build jacobian matrix
-        equation_block jacobin = build_jacobian(equations);
+        jacobian_block jacobian = build_jacobian(p, stages, equations);
+        
+        print_equations(stages, equations);
+        print_jacobian(stages, jacobian);
+
+        // for (int i = 0; i < jacobian.sizes.size(); i++) {
+        //     std::cout << jacobian.sizes[i] << " ";
+        // }
+        // std::cout << std::endl;
 
         // while true:
             // solve system
