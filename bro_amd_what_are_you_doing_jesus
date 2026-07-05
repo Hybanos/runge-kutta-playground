@@ -1,0 +1,10 @@
+#!/usr/bin/bash
+
+sudo docker build -t rocm-cmake . || exit
+sudo docker run -it --rm \
+    --device=/dev/kfd \
+    --device=/dev/dri \
+    --group-add=video \
+    --group-add=render \
+    -v .:/src \
+    rocm-cmake

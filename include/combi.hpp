@@ -79,7 +79,7 @@ class k_permutations {
         }
 
     public:
-        k_permutations(int _k, std::vector<T> &_v) : k{_k}, v{_v} {
+        k_permutations(uint64_t _k, std::vector<T> &_v) : k{_k}, v{_v} {
             total = tgammal(v.size() + 1) / tgammal(v.size() - k + 1);
             if (k == 1) total = v.size();
             out.resize(k * total);
