@@ -98,9 +98,9 @@ int main() {
         p.gen(stages);
 
         // build system of equations
-        equation_block equations = build_equations(p, stages);
+        auto equations = build_equations(p, stages);
         // build jacobian matrix
-        jacobian_block jacobian = build_jacobian(p, stages, equations);
+        auto jacobian = build_jacobian(p, stages, equations);
         
         print_equations(stages, equations);
         print_jacobian(stages, jacobian);

@@ -1,6 +1,6 @@
 #include "equations.hpp"
 
-equation_block build_equations(pool &p, uint8_t stages) {
+equation_block<Kokkos::HostSpace> build_equations(pool &p, uint8_t stages) {
 
     uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
     uint64_t equation_count = p.count_trees();
@@ -52,7 +52,7 @@ equation_block build_equations(pool &p, uint8_t stages) {
         }
         _equation_sizes[tree_i] = local_products;
         _equation_indexes[tree_i] = total_products;
-        _factorials[tree_i] = p.fact(*it);
+        _factorials[tree_i] = 1 / p.fact(*it);
         total_products += local_products;
         tree_i++;
     }
@@ -72,11 +72,11 @@ equation_block build_equations(pool &p, uint8_t stages) {
     //     std::cout << (int) _factors[i] << " ";
     // }
 
-    equation_block equations = {
-        .params = Kokkos::View<uint8_t **>("", _factors.size() / stages, stages),
-        .sizes = Kokkos::View<uint32_t *>("", _equation_sizes.size()),
-        .indexes = Kokkos::View<uint32_t *>("", _equation_indexes.size()),
-        .facts = Kokkos::View<double *>("", _factorials.size()),
+    equation_block<Kokkos::HostSpace> equations = {
+        .params = Kokkos::View<uint8_t **, Kokkos::HostSpace>("", _factors.size() / stages, stages),
+        .sizes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_sizes.size()),
+        .indexes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_indexes.size()),
+        .facts = Kokkos::View<double *, Kokkos::HostSpace>("", _factorials.size()),
     };
 
     std::memcpy(equations.params.data(), _factors.data(), _factors.size() * sizeof(uint8_t));
@@ -87,7 +87,7 @@ equation_block build_equations(pool &p, uint8_t stages) {
     return equations;
 }
 
-jacobian_block build_jacobian(pool &p, uint8_t stages, equation_block &equations) {
+jacobian_block<Kokkos::HostSpace> build_jacobian(pool &p, uint8_t stages, equation_block<Kokkos::HostSpace> &equations) {
 
     uint8_t param_count = (stages - 1) / (stages - 2) / 2 + stages + stages - 1;
     uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
@@ -133,10 +133,10 @@ jacobian_block build_jacobian(pool &p, uint8_t stages, equation_block &equations
         }
     }
 
-    jacobian_block jacobian = {
-        .params = Kokkos::View<uint8_t **>("", _factors.size() / stages, stages),
-        .sizes = Kokkos::View<uint32_t *>("", _equation_sizes.size()),
-        .indexes = Kokkos::View<uint32_t *>("", _equation_indexes.size()),
+    jacobian_block<Kokkos::HostSpace> jacobian = {
+        .params = Kokkos::View<uint8_t **, Kokkos::HostSpace>("", _factors.size() / stages, stages),
+        .sizes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_sizes.size()),
+        .indexes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_indexes.size()),
     };
 
     std::memcpy(jacobian.params.data(), _factors.data(), _factors.size() * sizeof(uint8_t));
@@ -146,7 +146,7 @@ jacobian_block build_jacobian(pool &p, uint8_t stages, equation_block &equations
     return jacobian;
 }
 
-void print_equations(uint8_t stages, equation_block equations) {
+void print_equations(uint8_t stages, equation_block<Kokkos::HostSpace> equations) {
     std::cout << "=== Equations ===" << std::endl;
     for (int i = 0; i < equations.sizes.size(); i++) {
         uint32_t size = equations.sizes[i];
@@ -166,7 +166,7 @@ void print_equations(uint8_t stages, equation_block equations) {
     }    
 }
 
-void print_jacobian(uint8_t stages, jacobian_block jacobian) {
+void print_jacobian(uint8_t stages, jacobian_block<Kokkos::HostSpace> jacobian) {
     uint8_t param_count = (stages - 1) / (stages - 2) / 2 + stages + stages - 1;
     int derivation_param = -1;
 

@@ -7,17 +7,19 @@
 #include "tree.hpp"
 #include "combi.hpp"
 
+template<class space>
 struct equation_block {
-    Kokkos::View<uint8_t **>params;
-    Kokkos::View<uint32_t *> sizes;
-    Kokkos::View<uint32_t *> indexes;
-    Kokkos::View<double *> facts;
+    Kokkos::View<uint8_t **, space> params;
+    Kokkos::View<uint32_t *, space> sizes;
+    Kokkos::View<uint32_t *, space> indexes;
+    Kokkos::View<double *, space> facts;
 };
 
+template<class space>
 struct jacobian_block {
-    Kokkos::View<uint8_t **> params;
-    Kokkos::View<uint32_t *> sizes;
-    Kokkos::View<uint32_t *> indexes;
+    Kokkos::View<uint8_t **, space> params;
+    Kokkos::View<uint32_t *, space> sizes;
+    Kokkos::View<uint32_t *, space> indexes;
 };
 
 struct factor {
@@ -99,8 +101,8 @@ __inline__ std::string get_factor(uint8_t index, uint8_t stages) {
     return "a_" + std::to_string((int) label_1 + 2) + std::to_string((int) label_2 + 1);
 }
 
-equation_block build_equations(pool &p, uint8_t stages);
-jacobian_block build_jacobian(pool &p, uint8_t stages, equation_block &equations);
+equation_block<Kokkos::HostSpace> build_equations(pool &p, uint8_t stages);
+jacobian_block<Kokkos::HostSpace> build_jacobian(pool &p, uint8_t stages, equation_block<Kokkos::HostSpace> &equations);
 
-void print_equations(uint8_t stages, equation_block equations);
-void print_jacobian(uint8_t stages, jacobian_block jacobian);
+void print_equations(uint8_t stages, equation_block<Kokkos::HostSpace> equations);
+void print_jacobian(uint8_t stages, jacobian_block<Kokkos::HostSpace> jacobian);

@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+dir="build"
+
 build=""
 if [ -f /usr/bin/ninja ]; then
     build="-G Ninja"
@@ -12,6 +14,7 @@ export OMP_PLACES=cores
 
 if [[ $1 == "--cuda" ]]; then
     options="-DKokkos_ENABLE_CUDA=ON"
+    dir=build-cuda
 fi
 
 if [[ $1 == "--hip" ]]; then
@@ -19,8 +22,9 @@ if [[ $1 == "--hip" ]]; then
     export CC=hipcc
     export CXX=hipcc
     export hip_DIR=/opt/rocm/lib/cmake/hip/
+    dir=build-hip
 fi
 
-cmake -B build -DCMAKE_BUILD_TYPE=Release $options $build || exit
-cmake --build build || exit
-time build/src/main || exit
+cmake -B $dir -DCMAKE_BUILD_TYPE=Release $options $build || exit
+cmake --build $dir || exit
+time $dir/src/main || exit
