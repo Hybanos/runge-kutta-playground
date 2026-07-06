@@ -7,20 +7,28 @@
 #include "tree.hpp"
 #include "combi.hpp"
 
-template<class space>
+template<class space, class layout>
 struct equation_block {
-    Kokkos::View<uint8_t **, space> params;
-    Kokkos::View<uint32_t *, space> sizes;
-    Kokkos::View<uint32_t *, space> indexes;
-    Kokkos::View<double *, space> facts;
+    using memory_space = typename space::memory_space;
+    Kokkos::View<uint8_t **, memory_space, layout> params;
+    Kokkos::View<uint32_t *, memory_space, layout> sizes;
+    Kokkos::View<uint32_t *, memory_space, layout> indexes;
+    Kokkos::View<double *, memory_space, layout> facts;
 };
 
-template<class space>
+template<class space, class layout>
 struct jacobian_block {
-    Kokkos::View<uint8_t **, space> params;
-    Kokkos::View<uint32_t *, space> sizes;
-    Kokkos::View<uint32_t *, space> indexes;
+    using memory_space = typename space::memory_space;
+    Kokkos::View<uint8_t **, memory_space, layout> params;
+    Kokkos::View<uint32_t *, memory_space, layout> sizes;
+    Kokkos::View<uint32_t *, memory_space, layout> indexes;
 };
+
+using host_equations = equation_block<Kokkos::HostSpace, Kokkos::LayoutRight>;
+using device_equations = equation_block<Kokkos::DefaultExecutionSpace, Kokkos::LayoutRight>;
+
+using host_jacobian = jacobian_block<Kokkos::HostSpace, Kokkos::LayoutRight>;
+using device_jacobian = jacobian_block<Kokkos::DefaultExecutionSpace, Kokkos::LayoutRight>;
 
 struct factor {
     char type = 0;
@@ -101,8 +109,8 @@ __inline__ std::string get_factor(uint8_t index, uint8_t stages) {
     return "a_" + std::to_string((int) label_1 + 2) + std::to_string((int) label_2 + 1);
 }
 
-equation_block<Kokkos::HostSpace> build_equations(pool &p, uint8_t stages);
-jacobian_block<Kokkos::HostSpace> build_jacobian(pool &p, uint8_t stages, equation_block<Kokkos::HostSpace> &equations);
+host_equations build_equations(pool &p, uint8_t stages);
+host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations);
 
-void print_equations(uint8_t stages, equation_block<Kokkos::HostSpace> equations);
-void print_jacobian(uint8_t stages, jacobian_block<Kokkos::HostSpace> jacobian);
+void print_equations(uint8_t stages, host_equations &equations);
+void print_jacobian(uint8_t stages, host_jacobian &jacobian);
