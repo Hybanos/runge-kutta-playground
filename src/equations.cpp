@@ -72,12 +72,18 @@ host_equations build_equations(pool &p, uint8_t stages) {
     //     std::cout << (int) _factors[i] << " ";
     // }
 
-    host_equations equations = {
-        .params = Kokkos::View<uint8_t **, Kokkos::HostSpace, Kokkos::LayoutRight>("", _factors.size() / stages, stages),
-        .sizes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_sizes.size()),
-        .indexes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_indexes.size()),
-        .facts = Kokkos::View<double *, Kokkos::HostSpace>("", _factorials.size()),
+    host_equations equations {
+        decltype(host_equations::params)("", _factors.size() / stages, stages),
+        decltype(host_equations::sizes)("", _equation_sizes.size()),
+        decltype(host_equations::indexes)("", _equation_indexes.size()),
+        decltype(host_equations::facts)("", _factorials.size()),
     };
+    
+    // Kokkos::View<uint32_t *, Kokkos::HostSpace, Kokkos::LayoutRight> equation_sizes("", _equation_sizes.size());
+    // host_equations equations {
+    //     decltype(host_equations::params)("", _factors.size() / stages, stages),
+    //     equation_sizes
+    // }
 
     std::memcpy(equations.params.data(), _factors.data(), _factors.size() * sizeof(uint8_t));
     std::memcpy(equations.sizes.data(), _equation_sizes.data(), _equation_sizes.size() * sizeof(uint32_t));
@@ -133,10 +139,10 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
         }
     }
 
-    host_jacobian jacobian = {
-        .params = Kokkos::View<uint8_t **, Kokkos::HostSpace, Kokkos::LayoutRight>("", _factors.size() / stages, stages),
-        .sizes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_sizes.size()),
-        .indexes = Kokkos::View<uint32_t *, Kokkos::HostSpace>("", _equation_indexes.size()),
+    host_jacobian jacobian {
+        decltype(host_jacobian::params)("", _factors.size() / stages, stages),
+        decltype(host_jacobian::sizes)("", _equation_sizes.size()),
+        decltype(host_jacobian::indexes)("", _equation_indexes.size()),
     };
 
     std::memcpy(jacobian.params.data(), _factors.data(), _factors.size() * sizeof(uint8_t));

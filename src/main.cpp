@@ -93,7 +93,7 @@ int main() {
         // exit(0);
 
         // generate trees
-        uint8_t stages = 5;
+        uint8_t stages = 4;
         pool p;
         p.gen(stages);
 
@@ -102,33 +102,33 @@ int main() {
         // build equation array and jacobian matrix 
         host_equations equations_h = build_equations(p, stages);
         host_jacobian jacobian_h = build_jacobian(p, stages, equations_h);
-        
+
         print_equations(stages, equations_h);
         print_jacobian(stages, jacobian_h);
 
-        // copy 
+        // auto tmp = Kokkos::create_mirror_view(equations_h.params);
+
+        // copy
         device_equations equations_d = {
-            // .params = Kokkos::create_mirror_view_and_copy(device_space, equations_h.params),
-            .params = Kokkos::View<uint8_t **>("", equations_h.params.layout()),
+            .params = decltype(device_equations::params)("", equations_h.params.extents()),
             .sizes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.sizes),
             .indexes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.indexes),
             .facts = Kokkos::create_mirror_view_and_copy(device_space, equations_h.facts),
         };
 
         device_jacobian jacobian_d = {
-            // .params = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.params),
+            .params = decltype(device_jacobian::params)("", jacobian_h.params.extents()),
             .sizes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.sizes),
             .indexes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.indexes),
         };
 
-        Kokkos::deep_copy(equations_d.params, equations_h.params);
-        // Kokkos::deep_copy(equations_d.sizes, equations_h.sizes);
-        // Kokkos::deep_copy(equations_d.indexes, equations_h.indexes);
-        // Kokkos::deep_copy(equations_d.facts, equations_h.facts);
-
-        // Kokkos::deep_copy(jacobian_d.params, jacobian_h.params);
-        // Kokkos::deep_copy(jacobian_d.sizes, jacobian_h.sizes);
-        // Kokkos::deep_copy(jacobian_d.indexes, jacobian_h.indexes);
+        auto tmp_equation_alloc = Kokkos::create_mirror_view(equations_d.params);
+        Kokkos::deep_copy(tmp_equation_alloc, equations_h.params);
+        Kokkos::deep_copy(equations_d.params, tmp_equation_alloc);
+        
+        auto tmp_jacobian_alloc = Kokkos::create_mirror_view(jacobian_d.params);
+        Kokkos::deep_copy(tmp_jacobian_alloc, jacobian_h.params);
+        Kokkos::deep_copy(jacobian_d.params, tmp_jacobian_alloc);
 
         // while(true) {}
 

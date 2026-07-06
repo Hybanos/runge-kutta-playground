@@ -7,28 +7,30 @@
 #include "tree.hpp"
 #include "combi.hpp"
 
-template<class space, class layout>
+template<class space>
 struct equation_block {
     using memory_space = typename space::memory_space;
-    Kokkos::View<uint8_t **, memory_space, layout> params;
-    Kokkos::View<uint32_t *, memory_space, layout> sizes;
-    Kokkos::View<uint32_t *, memory_space, layout> indexes;
-    Kokkos::View<double *, memory_space, layout> facts;
+    using layout = typename space::array_layout;
+    Kokkos::View<uint8_t **, layout, space> params;
+    Kokkos::View<uint32_t *, layout, space> sizes;
+    Kokkos::View<uint32_t *, layout, space> indexes;
+    Kokkos::View<double *  , layout, space> facts;
 };
 
-template<class space, class layout>
+template<class space>
 struct jacobian_block {
     using memory_space = typename space::memory_space;
-    Kokkos::View<uint8_t **, memory_space, layout> params;
-    Kokkos::View<uint32_t *, memory_space, layout> sizes;
-    Kokkos::View<uint32_t *, memory_space, layout> indexes;
+    using layout = typename space::array_layout;
+    Kokkos::View<uint8_t **, layout, memory_space> params;
+    Kokkos::View<uint32_t *, layout, memory_space> sizes;
+    Kokkos::View<uint32_t *, layout, memory_space> indexes;
 };
 
-using host_equations = equation_block<Kokkos::HostSpace, Kokkos::LayoutRight>;
-using device_equations = equation_block<Kokkos::DefaultExecutionSpace, Kokkos::LayoutRight>;
+using host_equations = equation_block<Kokkos::DefaultHostExecutionSpace>;
+using device_equations = equation_block<Kokkos::DefaultExecutionSpace>;
 
-using host_jacobian = jacobian_block<Kokkos::HostSpace, Kokkos::LayoutRight>;
-using device_jacobian = jacobian_block<Kokkos::DefaultExecutionSpace, Kokkos::LayoutRight>;
+using host_jacobian = jacobian_block<Kokkos::DefaultHostExecutionSpace>;
+using device_jacobian = jacobian_block<Kokkos::DefaultExecutionSpace>;
 
 struct factor {
     char type = 0;
