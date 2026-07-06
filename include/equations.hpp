@@ -15,6 +15,7 @@ struct equation_block {
     Kokkos::View<uint32_t *, layout, space> sizes;
     Kokkos::View<uint32_t *, layout, space> indexes;
     Kokkos::View<double *  , layout, space> facts;
+    uint64_t total = 0;
 };
 
 template<class space>
@@ -24,6 +25,7 @@ struct jacobian_block {
     Kokkos::View<uint8_t **, layout, memory_space> params;
     Kokkos::View<uint32_t *, layout, memory_space> sizes;
     Kokkos::View<uint32_t *, layout, memory_space> indexes;
+    uint64_t total = 0;
 };
 
 using host_equations = equation_block<Kokkos::DefaultHostExecutionSpace>;

@@ -5,6 +5,7 @@
 #include "tree.hpp"
 #include "combi.hpp"
 #include "equations.hpp"
+#include "solve.hpp"
 
 void test() {
     pool p(MAX_TREE_ORDER);
@@ -93,6 +94,7 @@ int main() {
         // exit(0);
 
         // generate trees
+        uint64_t N = 10;
         uint8_t stages = 4;
         pool p;
         p.gen(stages);
@@ -103,23 +105,23 @@ int main() {
         host_equations equations_h = build_equations(p, stages);
         host_jacobian jacobian_h = build_jacobian(p, stages, equations_h);
 
-        print_equations(stages, equations_h);
-        print_jacobian(stages, jacobian_h);
-
-        // auto tmp = Kokkos::create_mirror_view(equations_h.params);
+        // print_equations(stages, equations_h);
+        // print_jacobian(stages, jacobian_h);
 
         // copy
-        device_equations equations_d = {
-            .params = decltype(device_equations::params)("", equations_h.params.extents()),
-            .sizes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.sizes),
-            .indexes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.indexes),
-            .facts = Kokkos::create_mirror_view_and_copy(device_space, equations_h.facts),
+        device_equations equations_d {
+            .params = decltype(device_equations::params)("eq_param_d", equations_h.params.extents()),
+            .sizes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.sizes, "eq_sizes_d"),
+            .indexes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.indexes, "eq_indexes_d"),
+            .facts = Kokkos::create_mirror_view_and_copy(device_space, equations_h.facts, "eq_facts_d"),
+            .total = equations_h.total
         };
 
-        device_jacobian jacobian_d = {
-            .params = decltype(device_jacobian::params)("", jacobian_h.params.extents()),
-            .sizes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.sizes),
-            .indexes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.indexes),
+        device_jacobian jacobian_d {
+            .params = decltype(device_jacobian::params)("jc_param_d", jacobian_h.params.extents()),
+            .sizes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.sizes, "jd_sizes_d"),
+            .indexes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.indexes, "jc_indexes_d"),
+            .total = jacobian_h.total
         };
 
         auto tmp_equation_alloc = Kokkos::create_mirror_view(equations_d.params);
@@ -130,10 +132,26 @@ int main() {
         Kokkos::deep_copy(tmp_jacobian_alloc, jacobian_h.params);
         Kokkos::deep_copy(jacobian_d.params, tmp_jacobian_alloc);
 
-        // while(true) {}
+        Kokkos::View<double **> equations_reduce("eq_reduce", N, equations_h.sizes.size());
+        Kokkos::View<double **> jacobian_reduce("jc_reduce", N, jacobian_h.sizes.size());
 
-        // while true:
-            // solve system
+        Kokkos::View<double  **> x("x", N, stages + 2);
+        Kokkos::View<double ***> J("J", N, jacobian_h.sizes.size(), stages);
+        Kokkos::View<double ***> A("A", N, equations_h.sizes.size(), equations_h.sizes.size());
+        Kokkos::View<double  **> f("f", N, equations_h.sizes.size());
+
+        do {
+            evaluate_equations(N, stages, equations_d, x, equations_reduce);
+            // evaluate system
+                // reduction on products
+                // reduction on sums
+            // compute A = J.T @ J
+            // compute b = -J.T @ f
+            // solve A * x = b for x
+            // update x
+            // copy back and print f ?
+        } while(false);
+
     }
     Kokkos::finalize();
 
