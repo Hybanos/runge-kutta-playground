@@ -134,10 +134,10 @@ int main() {
         Kokkos::deep_copy(jacobian_d.params, tmp_jacobian_alloc);
 
         Kokkos::View<double **> equations_reduce("eq_reduce", N, equations_h.sizes.size());
-        Kokkos::View<double **> jacobian_reduce("jc_reduce", N, jacobian_h.sizes.size());
+        Kokkos::View<double **> jacobian_reduce("jc_reduce", N, jacobian_h.total);
 
         Kokkos::View<double  **> x("x", N, total_params + 2);
-        Kokkos::View<double ***> J("J", N, jacobian_h.sizes.size(), stages);
+        Kokkos::View<double ***> J("J", N, total_params, equations_h.sizes.size());
         Kokkos::View<double ***> A("A", N, equations_h.sizes.size(), equations_h.sizes.size());
         Kokkos::View<double  **> f("f", N, equations_h.sizes.size());
 
@@ -145,9 +145,11 @@ int main() {
 
         do {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
+            evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
             // auto copy = Kokkos::create_mirror_view_and_copy(f);
-            simple_copy_and_print_2d(x);
-            simple_copy_and_print_2d(f);
+            // simple_copy_and_print_2d(x);
+            // simple_copy_and_print_2d(f);
+            simple_copy_and_print_3d(J);
             // evaluate system
                 // reduction on products
                 // reduction on sums

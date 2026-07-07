@@ -99,11 +99,11 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
     uint8_t param_count = (stages - 1) / (stages - 2) / 2 + stages + stages - 1;
     uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
     uint8_t zero_index = one_index + 1;
-    uint64_t equation_count = p.count_trees();
+    uint64_t equation_count = p.count_trees() * param_count;
 
     std::vector<uint8_t> _factors;
-    std::vector<uint32_t> _equation_sizes(equation_count * param_count);
-    std::vector<uint32_t> _equation_indexes(equation_count * param_count);
+    std::vector<uint32_t> _equation_sizes(equation_count);
+    std::vector<uint32_t> _equation_indexes(equation_count);
    
     uint64_t total_products = 0;
     uint64_t equation_i = 0;
@@ -192,7 +192,8 @@ void print_jacobian(uint8_t stages, host_jacobian &jacobian) {
             for (int l = 0; l < stages; l++) {
                 uint8_t prod = jacobian.params(index + k, l);
 
-                std::cout << get_factor(prod, stages);
+                // std::cout << get_factor(prod, stages);
+                std::cout << (int) prod;
                 if (l < stages - 1) std::cout << "*";
             }
             if (k < size - 1) std::cout << " + ";
