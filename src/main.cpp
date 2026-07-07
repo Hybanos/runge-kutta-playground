@@ -94,19 +94,20 @@ int main() {
         // exit(0);
 
         // generate trees
-        uint64_t N = 10;
-        uint8_t stages = 4;
+        uint64_t N = 2;
+        uint8_t stages = 3;
         pool p;
         p.gen(stages);
 
+        uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
         auto device_space = Kokkos::DefaultExecutionSpace();
 
         // build equation array and jacobian matrix 
         host_equations equations_h = build_equations(p, stages);
         host_jacobian jacobian_h = build_jacobian(p, stages, equations_h);
 
-        // print_equations(stages, equations_h);
-        // print_jacobian(stages, jacobian_h);
+        print_equations(stages, equations_h);
+        print_jacobian(stages, jacobian_h);
 
         // copy
         device_equations equations_d {
@@ -135,13 +136,18 @@ int main() {
         Kokkos::View<double **> equations_reduce("eq_reduce", N, equations_h.sizes.size());
         Kokkos::View<double **> jacobian_reduce("jc_reduce", N, jacobian_h.sizes.size());
 
-        Kokkos::View<double  **> x("x", N, stages + 2);
+        Kokkos::View<double  **> x("x", N, total_params + 2);
         Kokkos::View<double ***> J("J", N, jacobian_h.sizes.size(), stages);
         Kokkos::View<double ***> A("A", N, equations_h.sizes.size(), equations_h.sizes.size());
         Kokkos::View<double  **> f("f", N, equations_h.sizes.size());
 
+        init_x(x);
+
         do {
-            evaluate_equations(N, stages, equations_d, x, equations_reduce);
+            evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
+            // auto copy = Kokkos::create_mirror_view_and_copy(f);
+            simple_copy_and_print_2d(x);
+            simple_copy_and_print_2d(f);
             // evaluate system
                 // reduction on products
                 // reduction on sums
