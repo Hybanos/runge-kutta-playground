@@ -21,6 +21,7 @@ void evaluate_jacobian(
     Kokkos::View<double **> &red, 
     Kokkos::View<double ***> &J
 );
+void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT);
 
 void simple_copy_and_print_2d(Kokkos::View<double **> &v);
 void simple_copy_and_print_3d(Kokkos::View<double ***> &v);

@@ -96,8 +96,8 @@ host_equations build_equations(pool &p, uint8_t stages) {
 
 host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations) {
 
-    uint8_t param_count = (stages - 1) / (stages - 2) / 2 + stages + stages - 1;
-    uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
+    uint8_t param_count = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
+    uint8_t one_index = param_count;
     uint8_t zero_index = one_index + 1;
     uint64_t equation_count = p.count_trees() * param_count;
 

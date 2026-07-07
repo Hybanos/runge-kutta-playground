@@ -106,8 +106,8 @@ int main() {
         host_equations equations_h = build_equations(p, stages);
         host_jacobian jacobian_h = build_jacobian(p, stages, equations_h);
 
-        print_equations(stages, equations_h);
-        print_jacobian(stages, jacobian_h);
+        // print_equations(stages, equations_h);
+        // print_jacobian(stages, jacobian_h);
 
         // copy
         device_equations equations_d {
@@ -125,6 +125,13 @@ int main() {
             .total = jacobian_h.total
         };
 
+        // std::cout << "==" << std::endl;
+        // for (int i = 0; i < jacobian_h.sizes.size(); i++) {
+        //     std::cout << jacobian_h.indexes[i] << "\t" << jacobian_h.sizes[i] << std::endl;
+        // }
+        // std::cout << jacobian_h.total << std::endl;
+        // std::cout << "==" << std::endl;
+
         auto tmp_equation_alloc = Kokkos::create_mirror_view(equations_d.params);
         Kokkos::deep_copy(tmp_equation_alloc, equations_h.params);
         Kokkos::deep_copy(equations_d.params, tmp_equation_alloc);
@@ -136,29 +143,29 @@ int main() {
         Kokkos::View<double **> equations_reduce("eq_reduce", N, equations_h.sizes.size());
         Kokkos::View<double **> jacobian_reduce("jc_reduce", N, jacobian_h.total);
 
-        Kokkos::View<double  **> x("x", N, total_params + 2);
-        Kokkos::View<double ***> J("J", N, total_params, equations_h.sizes.size());
-        Kokkos::View<double ***> A("A", N, equations_h.sizes.size(), equations_h.sizes.size());
+        Kokkos::View<double  **> x("x", N, total_params);
         Kokkos::View<double  **> f("f", N, equations_h.sizes.size());
+        Kokkos::View<double ***> J("J", N, total_params, equations_h.sizes.size());
+        Kokkos::View<double ***> JT("JT", N, equations_h.sizes.size(), total_params);
+        Kokkos::View<double ***> A("A", N, equations_h.sizes.size(), equations_h.sizes.size());
+        Kokkos::View<double  **> b("b", N, equations_h.sizes.size());
 
         init_x(x);
 
-        do {
+        for (int i = 0; i < 1; i++) {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
-            // auto copy = Kokkos::create_mirror_view_and_copy(f);
             // simple_copy_and_print_2d(x);
             // simple_copy_and_print_2d(f);
             simple_copy_and_print_3d(J);
-            // evaluate system
-                // reduction on products
-                // reduction on sums
+            transpose(J, JT);
+            simple_copy_and_print_3d(JT);
             // compute A = J.T @ J
             // compute b = -J.T @ f
-            // solve A * x = b for x
+            // solve A @ x = b for x
             // update x
             // copy back and print f ?
-        } while(false);
+        }
 
     }
     Kokkos::finalize();

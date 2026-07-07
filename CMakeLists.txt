@@ -11,11 +11,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Kokkos)
 
-# FetchContent_Declare(
-#     Kokkos-kernels
-#     GIT_REPOSITORY https://github.com/kokkos/kokkos-kernels
-#     GIT_TAG 5.1.1
-# )
-# FetchContent_MakeAvailable(Kokkos-kernels)
+FetchContent_Declare(
+    Kokkos-kernels
+    GIT_REPOSITORY https://github.com/kokkos/kokkos-kernels
+    GIT_TAG 5.1.1
+)
+FetchContent_MakeAvailable(Kokkos-kernels)
 
 add_subdirectory(src)

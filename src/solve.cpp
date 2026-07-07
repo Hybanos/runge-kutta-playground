@@ -5,11 +5,9 @@ void init_x(Kokkos::View<double **> &x) {
         "init",
         x.extent(0),
         KOKKOS_LAMBDA (uint64_t n) {
-            for (int i = 0; i < x.extent(1) - 2; i++) {
+            for (int i = 0; i < x.extent(1); i++) {
                 x(n, i) = 0.5;
             }
-            x(n, x.extent(1) - 2) = 1;
-            x(n, x.extent(1) - 1) = 0;
         }
     );
 }
@@ -25,6 +23,7 @@ void evaluate_equations(
     uint64_t begin[2] = {0, 0};
     uint64_t end[2] = {N, equations_h.total};
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy(begin, end);
+    uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
 
     Kokkos::parallel_for(
         "equation_prod_evaluate", 
@@ -33,7 +32,8 @@ void evaluate_equations(
             double prod = 1.0;
             for (int j = 0; j < stages; j++) {
                 uint8_t index = equations_d.params(i, j);
-                prod *= x(n, index);
+                // multiply by one 1 if we're out of the param range
+                if (index != total_params) prod *= x(n, index);
             }
             red(n, i) = prod;
         }
@@ -69,7 +69,6 @@ void evaluate_jacobian(
     Kokkos::View<double ***> &J) {
 
     uint64_t begin[2] = {0, 0};
-    // uint64_t end[2] = {N,jacobian_h.total};
     uint64_t end[2] = {N,jacobian_h.total};
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy(begin, end);
     uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
@@ -81,20 +80,23 @@ void evaluate_jacobian(
             double prod = 1.0;
             for (int j = 0; j < stages; j++) {
                 uint8_t index = jacobian_d.params(i, j);
-                prod *= x(n, index);
+                // multiply by one 1 if we're out of the param range
+                if (index != total_params) prod *= x(n, index);
             }
             red(n, i) = prod;
         }
     );
 
     Kokkos::fence();
+    simple_copy_and_print_2d(red);
+    Kokkos::fence();
 
     // TODO: this is cursed
     for (uint8_t derived = 0; derived < total_params; derived++) {
-        for (uint64_t eq = 0; eq < jacobian_h.sizes.size() / total_params; eq++) {
+        for (uint64_t eq = 0; eq < (jacobian_h.sizes.size() / total_params); eq++) {
             // if (jacobian_h.sizes[eq] == 0) continue;
 
-            uint64_t ind = derived * jacobian_h.sizes.size() / total_params + eq;
+            uint64_t ind = derived * (jacobian_h.sizes.size() / total_params) + eq;
 
             Kokkos::parallel_for(
                 "jacobian_prod_reduce",
@@ -110,6 +112,18 @@ void evaluate_jacobian(
         }
     }
 
+    Kokkos::fence();
+}
+
+void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT) {
+    Kokkos::MDRangePolicy<Kokkos::Rank<3>> policy({0, 0, 0}, {v.extent(0), v.extent(1), v.extent(2)});
+    Kokkos::parallel_for(
+        "transpose",
+        policy,
+        KOKKOS_LAMBDA (uint64_t n, uint64_t i, uint64_t j) {
+            vT(n, j, i) = v(n, i, j);
+        }
+    );
     Kokkos::fence();
 }
 
@@ -139,11 +153,11 @@ void simple_copy_and_print_3d(Kokkos::View<double ***> &v) {
 
     std::cout << "matrix: " << v.label() << std::endl;
     // print transposed
-    for (int k = 0; k < v.extent(0); k++) {
-        std::cout << "layer n=" << k << std::endl;
-        for (int i = 0; i < v.extent(1); i++) {
-            for (int j = 0; j < v.extent(2); j++) {
-                std::cout << copy(k, i, j) << "\t";
+    for (int i = 0; i < v.extent(0); i++) {
+        std::cout << "layer n=" << i << std::endl;
+        for (int j = 0; j < v.extent(1); j++) {
+            for (int k = 0; k < v.extent(2); k++) {
+                std::cout << copy(i, j, k) << "\t";
             }
             std::cout << std::endl;
         }
