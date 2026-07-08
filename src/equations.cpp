@@ -52,7 +52,7 @@ host_equations build_equations(pool &p, uint8_t stages) {
         }
         _equation_sizes[tree_i] = local_products;
         _equation_indexes[tree_i] = total_products;
-        _factorials[tree_i] = 1 / p.fact(*it);
+        _factorials[tree_i] = 1.0 / p.fact(*it);
         total_products += local_products;
         tree_i++;
     }

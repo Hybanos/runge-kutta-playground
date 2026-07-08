@@ -1,89 +1,13 @@
 #include <iostream>
 
 #include <Kokkos_Core.hpp>
+#include <KokkosBlas3_gemm.hpp>
+#include <KokkosLapack_gesv.hpp>
 
 #include "tree.hpp"
 #include "combi.hpp"
 #include "equations.hpp"
 #include "solve.hpp"
-
-void test() {
-    pool p(MAX_TREE_ORDER);
-
-    for (int i = 0; i < MAX_TREE_ORDER; i++) {
-        p[i].first_child = -1;
-        p[i].child_count = 0;
-    }
-
-    uint64_t off = 5;
-
-    p[off + 0].first_child = 1;
-    p[off + 0].child_count = 1;
-    p[off + 1].first_child = 1;
-    p[off + 1].child_count = 2;
-    p[off + 2].first_child = -1;
-    p[off + 2].child_count = 0;
-    p[off + 3].first_child = 1;
-    p[off + 3].child_count = 1;
-    p[off + 4].first_child = -1;
-    p[off + 4].child_count = 0;
-
-    std::cout << p.to_string(off) << std::endl;
-    p.print(off);
-    p.sort(off);
-    std::cout << p.to_string(off) << std::endl;
-    p.print(off);
-    std::cout << p.order(off) << std::endl;
-    std::cout << p.fact(off) << std::endl;
-}
-
-void test2() {
-    pool p(MAX_TREE_ORDER * 10);
-
-    for (int i = 0; i < MAX_TREE_ORDER * 10; i++) {
-        p[i].child_count = 0;
-    }
-
-    p[0].first_child = 1;
-    p[0].child_count = 1;
-    p[1].first_child = 1;
-    p[1].child_count = 1;
-    p[2].first_child = 1;
-    p[2].child_count = 1;
-
-    uint64_t node_top = 4;
-    p.copy_tree(0, node_top);
-    node_top += 4;
-    p.add_leaf(node_top, 4, 1);
-    std::cout << p.to_string(0) << std::endl;
-    p.print(0);
-
-    std::cout << p.to_string(4) << std::endl;
-    p.print(4);
-}
-
-void comb() {
-    int n = 7;
-    int k = 1;
-    std::vector<uint8_t> v(n);
-    // std::vector<int> v(n);
-
-    for (int i = 0; i < n; i++) {
-        v[i] = i;
-    }
-
-    for (auto it = permutations(v); !it.done(); ++it) {
-        for (int j = 0; j < n; j++) std::cout << (int) (*it)[j] << " ";
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-
-    auto it = k_permutations(k, v);
-    for (; !it.done(); ++it) {
-        for (int j = 0; j < k; j++) std::cout << (int) (*it)[j] << " ";
-        std::cout << std::endl;
-    }
-}
 
 int main() {
     Kokkos::initialize();
@@ -94,8 +18,8 @@ int main() {
         // exit(0);
 
         // generate trees
-        uint64_t N = 2;
-        uint8_t stages = 3;
+        uint64_t N = 1;
+        uint8_t stages = 5;
         pool p;
         p.gen(stages);
 
@@ -144,11 +68,12 @@ int main() {
         Kokkos::View<double **> jacobian_reduce("jc_reduce", N, jacobian_h.total);
 
         Kokkos::View<double  **> x("x", N, total_params);
+        Kokkos::View<int     **> ipiv("ipiv", N, total_params);
         Kokkos::View<double  **> f("f", N, equations_h.sizes.size());
         Kokkos::View<double ***> J("J", N, total_params, equations_h.sizes.size());
-        Kokkos::View<double ***> JT("JT", N, equations_h.sizes.size(), total_params);
-        Kokkos::View<double ***> A("A", N, equations_h.sizes.size(), equations_h.sizes.size());
-        Kokkos::View<double  **> b("b", N, equations_h.sizes.size());
+        // Kokkos::View<double ***> JT("JT", N, equations_h.sizes.size(), total_params);
+        Kokkos::View<double ***> A("A", N, total_params, total_params);
+        Kokkos::View<double  **> b("b", N, total_params);
 
         init_x(x);
 
@@ -157,12 +82,39 @@ int main() {
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
             // simple_copy_and_print_2d(x);
             // simple_copy_and_print_2d(f);
-            simple_copy_and_print_3d(J);
-            transpose(J, JT);
-            simple_copy_and_print_3d(JT);
-            // compute A = J.T @ J
-            // compute b = -J.T @ f
-            // solve A @ x = b for x
+
+            // compute A = J.T @ J
+            for (int n = 0; n < N; n++) {
+                auto _J = Kokkos::subview(J, n, Kokkos::ALL(), Kokkos::ALL());
+                auto _A = Kokkos::subview(A, n, Kokkos::ALL(), Kokkos::ALL());
+                KokkosBlas::gemm("N", "T", 1, _J, _J, 1, _A);
+            }
+            // check if kokkos-kernels needs fencing ?
+            Kokkos::fence();
+
+            // compute b = -J.T @ f
+            for (int n = 0; n < N; n++) {
+                auto _J = Kokkos::subview(J, n, Kokkos::ALL(), Kokkos::ALL());
+                auto _f = Kokkos::subview(f, n, Kokkos::ALL());
+                auto _b = Kokkos::subview(b, n, Kokkos::ALL());
+                KokkosBlas::gemv("N", -1, _J, _f, 0, _b);
+            }
+            Kokkos::fence();
+
+            simple_copy_and_print_2d(b);
+
+            // solve A @ dx = b for dx
+            for (int n = 0; n < N; n++) {
+                Kokkos::View<double **> _A = Kokkos::subview(A, n, Kokkos::ALL(), Kokkos::ALL());
+                Kokkos::View<double *> _b = Kokkos::subview(b, n, Kokkos::ALL());
+                Kokkos::View<int *> _ipiv = Kokkos::subview(ipiv, n, Kokkos::ALL());
+                KokkosLapack::gesv(device_space, _A, _b, _ipiv);
+            }
+            Kokkos::fence();
+
+            simple_copy_and_print_2d(x);
+            simple_copy_and_print_2d(b);
+
             // update x
             // copy back and print f ?
         }

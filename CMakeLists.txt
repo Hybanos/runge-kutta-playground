@@ -7,7 +7,7 @@ include(FetchContent)
 FetchContent_Declare(
     Kokkos
     GIT_REPOSITORY https://github.com/kokkos/kokkos
-    GIT_TAG 5.1.1 
+    GIT_TAG 5.1.1
 )
 FetchContent_MakeAvailable(Kokkos)
 

@@ -52,7 +52,7 @@ void evaluate_equations(
                 for (uint64_t i = 0; i < equations_d.sizes[eq]; i++) {
                     sum += red(n, equations_d.indexes[eq] + i);
                 }
-                f(n, eq) = sum;
+                f(n, eq) = sum - equations_d.facts[eq];
             }
         );
     }
@@ -88,8 +88,8 @@ void evaluate_jacobian(
     );
 
     Kokkos::fence();
-    simple_copy_and_print_2d(red);
-    Kokkos::fence();
+    // simple_copy_and_print_2d(red);
+    // Kokkos::fence();
 
     // TODO: this is cursed
     for (uint8_t derived = 0; derived < total_params; derived++) {

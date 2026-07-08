@@ -13,7 +13,7 @@ export OMP_PROC_BIND=true
 export OMP_PLACES=cores
 
 if [[ $1 == "--cuda" ]]; then
-    options="-DKokkos_ENABLE_CUDA=ON"
+    options="-DKokkos_ENABLE_CUDA=ON -DKokkosKernels_ENABLE_TPL_CUBLAS=ON -DKokkosKernels_ENABLE_TPL_CUSOLVER=ON"
     dir=build-cuda
 fi
 
@@ -25,6 +25,6 @@ if [[ $1 == "--hip" ]]; then
     dir=build-hip
 fi
 
-cmake -B $dir -DCMAKE_BUILD_TYPE=Release $options $build || exit
+cmake -B $dir -DCMAKE_BUILD_TYPE=Release -DKokkosKernels_ENABLE_COMPONENT_LAPACK=ON $options $build || exit
 cmake --build $dir || exit
 time $dir/src/main || exit
