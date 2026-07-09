@@ -1,13 +1,18 @@
 #include "solve.hpp"
 
 void init_x(Kokkos::View<double **> &x) {
+
+    Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
+
     Kokkos::parallel_for(
         "init",
         x.extent(0),
         KOKKOS_LAMBDA (uint64_t n) {
+            auto generator = random_pool.get_state();
             for (int i = 0; i < x.extent(1); i++) {
-                x(n, i) = 0.5;
+                x(n, i) = generator.drand(0.0, 1.0);
             }
+            random_pool.free_state(generator);
         }
     );
 }
@@ -127,40 +132,13 @@ void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT) {
     Kokkos::fence();
 }
 
-void simple_copy_and_print_2d(Kokkos::View<double **> &v) {
-    auto tmp = Kokkos::create_mirror_view(v);
-    auto copy = Kokkos::View<double **, Kokkos::DefaultHostExecutionSpace>("", v.extents());
-
-    Kokkos::deep_copy(tmp, v);
-    Kokkos::deep_copy(copy, tmp);
-
-    std::cout << "matrix: " << v.label() << std::endl;
-    // print transposed
-    for (int j = 0; j < v.extent(1); j++) {
-        for (int i = 0; i < v.extent(0); i++) {
-            std::cout << copy(i, j) << "\t";
+void update_weights(int N, Kokkos::View<double **> &x, Kokkos::View<double **> &dx) {
+    Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
+    Kokkos::parallel_for(
+        "update_weights",
+        policy,
+        KOKKOS_LAMBDA (uint64_t n, uint64_t i) {
+            x(n, i) += dx(n, i);
         }
-        std::cout << std::endl;
-    }
-}
-
-void simple_copy_and_print_3d(Kokkos::View<double ***> &v) {
-    auto tmp = Kokkos::create_mirror_view(v);
-    auto copy = Kokkos::View<double ***, Kokkos::DefaultHostExecutionSpace>("", v.extents());
-
-    Kokkos::deep_copy(tmp, v);
-    Kokkos::deep_copy(copy, tmp);
-
-    std::cout << "matrix: " << v.label() << std::endl;
-    // print transposed
-    for (int i = 0; i < v.extent(0); i++) {
-        std::cout << "layer n=" << i << std::endl;
-        for (int j = 0; j < v.extent(1); j++) {
-            for (int k = 0; k < v.extent(2); k++) {
-                std::cout << copy(i, j, k) << "\t";
-            }
-            std::cout << std::endl;
-        }
-        std::cout << std::endl << std::endl;
-    }
+    );
 }

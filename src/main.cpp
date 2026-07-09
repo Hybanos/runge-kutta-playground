@@ -19,7 +19,7 @@ int main() {
 
         // generate trees
         uint64_t N = 1;
-        uint8_t stages = 5;
+        uint8_t stages = 3;
         pool p;
         p.gen(stages);
 
@@ -77,7 +77,7 @@ int main() {
 
         init_x(x);
 
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 10000; i++) {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
             // simple_copy_and_print_2d(x);
@@ -101,7 +101,8 @@ int main() {
             }
             Kokkos::fence();
 
-            simple_copy_and_print_2d(b);
+            // simple_copy_and_print_3d(A);
+            // simple_copy_and_print_2d(b);
 
             // solve A @ dx = b for dx
             for (int n = 0; n < N; n++) {
@@ -112,8 +113,14 @@ int main() {
             }
             Kokkos::fence();
 
-            simple_copy_and_print_2d(x);
-            simple_copy_and_print_2d(b);
+            update_weights(N, x, b);
+            Kokkos::fence();
+
+            if (!(i%10000)) {
+                simple_copy_and_print_2d(f);
+                simple_copy_and_print_2d(x);
+            }
+            // simple_copy_and_print_2d(b);
 
             // update x
             // copy back and print f ?

@@ -25,6 +25,14 @@ if [[ $1 == "--hip" ]]; then
     dir=build-hip
 fi
 
-cmake -B $dir -DCMAKE_BUILD_TYPE=Release -DKokkosKernels_ENABLE_COMPONENT_LAPACK=ON $options $build || exit
+cmake -B $dir $options $build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DKokkosKernels_ENABLE_COMPONENT_COMMON=ON \
+    -DKokkosKernels_ENABLE_COMPONENT_BATCHED=OFF \
+    -DKokkosKernels_ENABLE_COMPONENT_BLAS=ON \
+    -DKokkosKernels_ENABLE_COMPONENT_LAPACK=ON \
+    -DKokkosKernels_ENABLE_COMPONENT_GRAPH=OFF \
+    -DKokkosKernels_ENABLE_COMPONENT_SPARSE=OFF \
+    -DKokkosKernels_ENABLE_COMPONENT_ODE=OFF || exit
 cmake --build $dir || exit
 time $dir/src/main || exit
