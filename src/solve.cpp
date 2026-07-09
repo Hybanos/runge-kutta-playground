@@ -1,17 +1,17 @@
 #include "solve.hpp"
 
 void init_x(Kokkos::View<double **> &x) {
-
+    Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
     Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
+    // Kokkos::Random_XorShift64_Pool<> random_pool(0);
 
     Kokkos::parallel_for(
         "init",
-        x.extent(0),
-        KOKKOS_LAMBDA (uint64_t n) {
+        policy,
+        KOKKOS_LAMBDA (uint64_t i, uint64_t j) {
             auto generator = random_pool.get_state();
-            for (int i = 0; i < x.extent(1); i++) {
-                x(n, i) = generator.drand(0.0, 1.0);
-            }
+            // x(i, j) = generator.drand(0.0, 1.0);
+            x(i, j) = 0.1 * (i+1);
             random_pool.free_state(generator);
         }
     );
@@ -26,25 +26,27 @@ void evaluate_equations(
     Kokkos::View<double **> &f) {
 
     uint64_t begin[2] = {0, 0};
-    uint64_t end[2] = {N, equations_h.total};
+    uint64_t end[2] = {equations_h.total, N};
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy(begin, end);
     uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
 
     Kokkos::parallel_for(
         "equation_prod_evaluate", 
         policy, 
-        KOKKOS_LAMBDA (uint64_t n, uint64_t i) {
+        KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             double prod = 1.0;
             for (int j = 0; j < stages; j++) {
                 uint8_t index = equations_d.params(i, j);
                 // multiply by one 1 if we're out of the param range
-                if (index != total_params) prod *= x(n, index);
+                if (index != total_params) prod *= x(index, n);
             }
-            red(n, i) = prod;
+            red(i, n) = prod;
         }
     );
 
     Kokkos::fence();
+    // simple_copy_and_print_2d(red);
+    // Kokkos::fence();
 
     // TODO: this is cursed
     for (uint64_t eq = 0; eq < equations_h.sizes.size(); eq++) {
@@ -55,13 +57,12 @@ void evaluate_equations(
             KOKKOS_LAMBDA (uint64_t n) {
                 double sum = 0;
                 for (uint64_t i = 0; i < equations_d.sizes[eq]; i++) {
-                    sum += red(n, equations_d.indexes[eq] + i);
+                    sum += red(equations_d.indexes[eq] + i, n);
                 }
-                f(n, eq) = sum - equations_d.facts[eq];
+                f(eq, n) = sum - equations_d.facts[eq];
             }
         );
     }
-
     Kokkos::fence();
 }
 
@@ -74,27 +75,27 @@ void evaluate_jacobian(
     Kokkos::View<double ***> &J) {
 
     uint64_t begin[2] = {0, 0};
-    uint64_t end[2] = {N,jacobian_h.total};
+    uint64_t end[2] = {jacobian_h.total, N};
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy(begin, end);
     uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
 
     Kokkos::parallel_for(
         "jacobian_prod_evaluate", 
         policy, 
-        KOKKOS_LAMBDA (uint64_t n, uint64_t i) {
+        KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             double prod = 1.0;
             for (int j = 0; j < stages; j++) {
                 uint8_t index = jacobian_d.params(i, j);
-                // multiply by one 1 if we're out of the param range
-                if (index != total_params) prod *= x(n, index);
+                // multiply by one if we're out of the param range
+                if (index != total_params) prod *= x(index, n);
             }
-            red(n, i) = prod;
+            red(i, n) = prod;
         }
     );
 
     Kokkos::fence();
-    // simple_copy_and_print_2d(red);
-    // Kokkos::fence();
+    simple_copy_and_print_2d(red);
+    Kokkos::fence();
 
     // TODO: this is cursed
     for (uint8_t derived = 0; derived < total_params; derived++) {
@@ -109,14 +110,13 @@ void evaluate_jacobian(
                 KOKKOS_LAMBDA (uint64_t n) {
                     double sum = 0;
                     for (uint64_t i = 0; i < jacobian_d.sizes[ind]; i++) {
-                        sum += red(n, jacobian_d.indexes[ind] + i);
+                        sum += red(jacobian_d.indexes[ind] + i, n);
                     }
-                    J(n, derived, eq) = sum;
+                    J(derived, eq, n) = sum;
                 }
             );
         }
     }
-
     Kokkos::fence();
 }
 
@@ -125,20 +125,20 @@ void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT) {
     Kokkos::parallel_for(
         "transpose",
         policy,
-        KOKKOS_LAMBDA (uint64_t n, uint64_t i, uint64_t j) {
-            vT(n, j, i) = v(n, i, j);
+        KOKKOS_LAMBDA (uint64_t i, uint64_t j, uint64_t n) {
+            vT(j, i, n) = v(i, j, n);
         }
     );
     Kokkos::fence();
 }
 
-void update_weights(int N, Kokkos::View<double **> &x, Kokkos::View<double **> &dx) {
+void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx) {
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
     Kokkos::parallel_for(
         "update_weights",
         policy,
-        KOKKOS_LAMBDA (uint64_t n, uint64_t i) {
-            x(n, i) += dx(n, i);
+        KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
+            x(i, n) += dx(i, n);
         }
     );
 }

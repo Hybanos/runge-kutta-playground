@@ -12,11 +12,6 @@
 int main() {
     Kokkos::initialize();
     {
-        // test();
-        // test2();
-        // comb();
-        // exit(0);
-
         // generate trees
         uint64_t N = 1;
         uint8_t stages = 3;
@@ -64,29 +59,29 @@ int main() {
         Kokkos::deep_copy(tmp_jacobian_alloc, jacobian_h.params);
         Kokkos::deep_copy(jacobian_d.params, tmp_jacobian_alloc);
 
-        Kokkos::View<double **> equations_reduce("eq_reduce", N, equations_h.sizes.size());
-        Kokkos::View<double **> jacobian_reduce("jc_reduce", N, jacobian_h.total);
+        Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.sizes.size(), N);
+        Kokkos::View<double  **> jacobian_reduce("jc_reduce", jacobian_h.total, N);
 
-        Kokkos::View<double  **> x("x", N, total_params);
-        Kokkos::View<int     **> ipiv("ipiv", N, total_params);
-        Kokkos::View<double  **> f("f", N, equations_h.sizes.size());
-        Kokkos::View<double ***> J("J", N, total_params, equations_h.sizes.size());
-        // Kokkos::View<double ***> JT("JT", N, equations_h.sizes.size(), total_params);
-        Kokkos::View<double ***> A("A", N, total_params, total_params);
-        Kokkos::View<double  **> b("b", N, total_params);
+        Kokkos::View<double  **> x("x", total_params, N);
+        Kokkos::View<int     **> ipiv("ipiv", total_params, N);
+        Kokkos::View<double  **> f("f", equations_h.sizes.size(), N);
+        Kokkos::View<double ***> J("J", total_params, equations_h.sizes.size(), N);
+        Kokkos::View<double ***> A("A", total_params, total_params, N);
+        Kokkos::View<double  **> b("b", total_params, N);
 
         init_x(x);
 
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 1; i++) {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
-            // simple_copy_and_print_2d(x);
-            // simple_copy_and_print_2d(f);
+            simple_copy_and_print_2d(x);
+            simple_copy_and_print_2d(f);
+            simple_copy_and_print_3d(J);
 
             // compute A = J.T @ J
             for (int n = 0; n < N; n++) {
-                auto _J = Kokkos::subview(J, n, Kokkos::ALL(), Kokkos::ALL());
-                auto _A = Kokkos::subview(A, n, Kokkos::ALL(), Kokkos::ALL());
+                auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
+                auto _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
                 KokkosBlas::gemm("N", "T", 1, _J, _J, 1, _A);
             }
             // check if kokkos-kernels needs fencing ?
@@ -94,33 +89,34 @@ int main() {
 
             // compute b = -J.T @ f
             for (int n = 0; n < N; n++) {
-                auto _J = Kokkos::subview(J, n, Kokkos::ALL(), Kokkos::ALL());
-                auto _f = Kokkos::subview(f, n, Kokkos::ALL());
-                auto _b = Kokkos::subview(b, n, Kokkos::ALL());
+                auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
+                auto _f = Kokkos::subview(f, Kokkos::ALL(), n);
+                auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
                 KokkosBlas::gemv("N", -1, _J, _f, 0, _b);
             }
             Kokkos::fence();
 
-            // simple_copy_and_print_3d(A);
-            // simple_copy_and_print_2d(b);
+            simple_copy_and_print_3d(A);
+            simple_copy_and_print_2d(b);
 
             // solve A @ dx = b for dx
             for (int n = 0; n < N; n++) {
-                Kokkos::View<double **> _A = Kokkos::subview(A, n, Kokkos::ALL(), Kokkos::ALL());
-                Kokkos::View<double *> _b = Kokkos::subview(b, n, Kokkos::ALL());
-                Kokkos::View<int *> _ipiv = Kokkos::subview(ipiv, n, Kokkos::ALL());
+                Kokkos::View<double **> _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
+                Kokkos::View<double *> _b = Kokkos::subview(b, Kokkos::ALL(), n);
+                Kokkos::View<int *> _ipiv = Kokkos::subview(ipiv, Kokkos::ALL(), n);
                 KokkosLapack::gesv(device_space, _A, _b, _ipiv);
             }
             Kokkos::fence();
 
-            update_weights(N, x, b);
+            update_weights(x, b);
             Kokkos::fence();
 
-            if (!(i%10000)) {
+            if (!(i%1)) {
                 simple_copy_and_print_2d(f);
                 simple_copy_and_print_2d(x);
+                simple_copy_and_print_2d(b);
+                simple_copy_and_print_2d(ipiv);
             }
-            // simple_copy_and_print_2d(b);
 
             // update x
             // copy back and print f ?

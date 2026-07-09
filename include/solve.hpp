@@ -22,7 +22,7 @@ void evaluate_jacobian(
     Kokkos::View<double ***> &J
 );
 void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT);
-void update_weights(int N, Kokkos::View<double **> &x, Kokkos::View<double **> &dx);
+void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx);
 
 template<class T>
 void simple_copy_and_print_2d(Kokkos::View<T **> &v) {
@@ -34,9 +34,9 @@ void simple_copy_and_print_2d(Kokkos::View<T **> &v) {
 
     std::cout << "matrix: " << v.label() << std::endl;
     // print transposed
-    for (int j = 0; j < v.extent(1); j++) {
-        for (int i = 0; i < v.extent(0); i++) {
-            std::cout << copy(i, j) << "\t";
+    for (int j = 0; j < v.extent(0); j++) {
+        for (int i = 0; i < v.extent(1); i++) {
+            std::cout << copy(j, i) << "\t";
         }
         std::cout << std::endl;
     }
@@ -52,11 +52,11 @@ void simple_copy_and_print_3d(Kokkos::View<T ***> &v) {
 
     std::cout << "matrix: " << v.label() << std::endl;
     // print transposed
-    for (int i = 0; i < v.extent(0); i++) {
-        std::cout << "layer n=" << i << std::endl;
-        for (int j = 0; j < v.extent(1); j++) {
-            for (int k = 0; k < v.extent(2); k++) {
-                std::cout << copy(i, j, k) << "\t";
+    for (int n = 0; n < v.extent(2); n++) {
+        std::cout << "layer n=" << n << std::endl;
+        for (int i = 0; i < v.extent(0); i++) {
+            for (int j = 0; j < v.extent(1); j++) {
+                std::cout << copy(i, j, n) << "\t";
             }
             std::cout << std::endl;
         }
