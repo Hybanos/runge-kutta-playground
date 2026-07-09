@@ -1,6 +1,7 @@
 FROM rocm/dev-ubuntu-24.04
 
-RUN apt update -y && apt install -y build-essential cmake git ninja-build
+RUN apt update -y && apt install -y build-essential cmake git ninja-build rocblas rocsolver
 
 WORKDIR /src
 ENTRYPOINT [ "/src/run", "--hip" ]
+# ENTRYPOINT [ "bash" ]

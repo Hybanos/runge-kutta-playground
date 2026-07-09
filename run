@@ -18,10 +18,14 @@ if [[ $1 == "--cuda" ]]; then
 fi
 
 if [[ $1 == "--hip" ]]; then
-    options="-DKokkos_ENABLE_HIP=ON -DKokkos_ENABLE_ROCTHRUST=OFF"
+    options="-DKokkos_ENABLE_HIP=ON -DKokkosKernels_ENABLE_TPL_ROCBLAS=ON -DKokkosKernels_ENABLE_TPL_ROCSOLVER=ON -DKokkosKernels_ENABLE_TPL_ROCSPARSE=ON"
     export CC=hipcc
     export CXX=hipcc
     export hip_DIR=/opt/rocm/lib/cmake/hip/
+    export rocblas_DIR=/opt/rocm/lib/cmake/rocblas
+    export ROCBLAS_DIR=/opt/rocm/lib/cmake/rocblas
+    export ROCSOLVER_DIR=/opt/rocm/lib/cmake/rocsolver
+    export ROCSPARSE_DIR=/opt/rocm/lib/cmake/rocsparse
     dir=build-hip
 fi
 

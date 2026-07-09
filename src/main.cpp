@@ -14,7 +14,7 @@ int main() {
     {
         // generate trees
         uint64_t N = 1;
-        uint8_t stages = 3;
+        uint8_t stages = 8;
         pool p;
         p.gen(stages);
 
@@ -71,12 +71,12 @@ int main() {
 
         init_x(x);
 
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 100000; i++) {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
-            simple_copy_and_print_2d(x);
-            simple_copy_and_print_2d(f);
-            simple_copy_and_print_3d(J);
+            // simple_copy_and_print_2d(x);
+            // simple_copy_and_print_2d(f);
+            // simple_copy_and_print_3d(J);
 
             // compute A = J.T @ J
             for (int n = 0; n < N; n++) {
@@ -96,26 +96,26 @@ int main() {
             }
             Kokkos::fence();
 
-            simple_copy_and_print_3d(A);
-            simple_copy_and_print_2d(b);
+            // simple_copy_and_print_3d(A);
+            // simple_copy_and_print_2d(b);
 
             // solve A @ dx = b for dx
             for (int n = 0; n < N; n++) {
                 Kokkos::View<double **> _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
                 Kokkos::View<double *> _b = Kokkos::subview(b, Kokkos::ALL(), n);
                 Kokkos::View<int *> _ipiv = Kokkos::subview(ipiv, Kokkos::ALL(), n);
-                KokkosLapack::gesv(device_space, _A, _b, _ipiv);
+                KokkosLapack::gesv(_A, _b, _ipiv);
             }
             Kokkos::fence();
 
             update_weights(x, b);
             Kokkos::fence();
 
-            if (!(i%1)) {
+            if (!(i%1000)) {
                 simple_copy_and_print_2d(f);
-                simple_copy_and_print_2d(x);
-                simple_copy_and_print_2d(b);
-                simple_copy_and_print_2d(ipiv);
+                // simple_copy_and_print_2d(x);
+                // simple_copy_and_print_2d(b);
+                // simple_copy_and_print_2d(ipiv);
             }
 
             // update x
