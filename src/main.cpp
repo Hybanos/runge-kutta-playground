@@ -9,12 +9,16 @@
 #include "equations.hpp"
 #include "solve.hpp"
 
-int main() {
-    Kokkos::initialize();
+int main(int argc, char **argv) {
+    Kokkos::initialize(argc, argv);
     {
         // generate trees
         uint64_t N = 1;
-        uint8_t stages = 8;
+        uint8_t stages = 3;
+        uint64_t max_iter = 100;
+        if (argc > 1) stages = std::stoi(argv[1]);
+        if (argc > 2) N = std::stoi(argv[2]);
+        if (argc > 3) max_iter = std::stoi(argv[3]);
         pool p;
         p.gen(stages);
 
@@ -71,7 +75,7 @@ int main() {
 
         init_x(x);
 
-        for (int i = 0; i < 100000; i++) {
+        for (int i = 0; i < max_iter; i++) {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
             // simple_copy_and_print_2d(x);

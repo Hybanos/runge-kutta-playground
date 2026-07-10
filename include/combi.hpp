@@ -95,5 +95,5 @@ class k_permutations {
             return d;
         }
         void operator++() {iter++;}
-        T* operator*() {return out.data() + iter * k;}
+        T* operator*() {return &(out[iter * k]);}
 };

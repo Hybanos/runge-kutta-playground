@@ -39,4 +39,4 @@ cmake -B $dir $options $build \
     -DKokkosKernels_ENABLE_COMPONENT_SPARSE=OFF \
     -DKokkosKernels_ENABLE_COMPONENT_ODE=OFF || exit
 cmake --build $dir || exit
-time $dir/src/main || exit
+time $dir/src/main $2 $3 $4 || exit
