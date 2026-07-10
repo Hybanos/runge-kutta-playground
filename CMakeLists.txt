@@ -18,4 +18,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Kokkos-kernels)
 
+FetchContent_Declare(
+    Kokkos-tools
+    GIT_REPOSITORY https://github.com/kokkos/kokkos-tools
+    GIT_TAG develop
+)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(Kokkos-tools)
+
 add_subdirectory(src)

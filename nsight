@@ -1,0 +1,3 @@
+#!/usr/bin/bash
+
+nsys profile -o report ./build-cuda/src/main $1 $2 $3 --kokkos-tools-libs=$(pwd)/build-cuda/_deps/kokkos-tools-build/profiling/nvtx-connector/libkp_nvtx_connector.so
