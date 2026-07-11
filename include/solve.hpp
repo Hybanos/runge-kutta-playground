@@ -28,7 +28,7 @@ void evaluate_jacobian(
 );
 void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double ***> &A);
 void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double **> &f, Kokkos::View<double **> &b);
-void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<int **> &ipiv);
+void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<double **> &x);
 void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT);
 void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx);
 

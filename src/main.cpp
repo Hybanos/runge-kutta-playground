@@ -72,42 +72,37 @@ int main(int argc, char **argv) {
         Kokkos::View<double ***> J("J", total_params, equations_h.sizes.size(), N);
         Kokkos::View<double ***> A("A", total_params, total_params, N);
         Kokkos::View<double  **> b("b", total_params, N);
+        Kokkos::View<double  **> dx("dx", total_params, N);
 
         init_x(x);
+        Kokkos::fence();
 
         for (int i = 0; i < max_iter; i++) {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
+            Kokkos::fence();
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
+            Kokkos::fence();
 
             // simple_copy_and_print_2d(x);
             // simple_copy_and_print_2d(f);
             // simple_copy_and_print_3d(J);
 
+            // compute A = J.T @ J
             batched_transposed_gemm(N, J, A);
+            Kokkos::fence();
 
             // compute b = -J.T @ f
-            for (int n = 0; n < N; n++) {
-                auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
-                auto _f = Kokkos::subview(f, Kokkos::ALL(), n);
-                auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
-                KokkosBlas::gemv("N", -1, _J, _f, 0, _b);
-            }
-            Kokkos::fence();
             batched_gemv(N, J, f, b);
+            Kokkos::fence();
 
             // simple_copy_and_print_3d(A);
             // simple_copy_and_print_2d(b);
 
             // solve A @ dx = b for dx
-            for (int n = 0; n < N; n++) {
-                Kokkos::View<double **> _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
-                Kokkos::View<double *> _b = Kokkos::subview(b, Kokkos::ALL(), n);
-                Kokkos::View<int *> _ipiv = Kokkos::subview(ipiv, Kokkos::ALL(), n);
-                KokkosLapack::gesv(_A, _b, _ipiv);
-            }
+            batched_gesv(N, A, b, dx);
             Kokkos::fence();
 
-            update_weights(x, b);
+            update_weights(x, dx);
             Kokkos::fence();
 
             if (!(i%1000)) {
