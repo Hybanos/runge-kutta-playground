@@ -1,9 +1,11 @@
 #include "solve.hpp"
 
+typedef Kokkos::TeamPolicy<>::member_type member_type;
+
 void init_x(Kokkos::View<double **> &x) {
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
-    Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
-    // Kokkos::Random_XorShift64_Pool<> random_pool(2);
+    // Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
+    Kokkos::Random_XorShift64_Pool<> random_pool(2);
 
     Kokkos::parallel_for(
         "init",
@@ -108,6 +110,68 @@ void evaluate_jacobian(
         }
     );
 
+    Kokkos::fence();
+}
+
+void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double ***> &A) {
+    using namespace KokkosBatched;
+
+    Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
+
+    Kokkos::parallel_for(
+        "batched_transposed_gemm",
+        policy,
+        KOKKOS_LAMBDA (member_type team_member) {
+            uint64_t n = team_member.league_rank();
+            auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
+            auto _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
+            TeamGemm<member_type, Trans::NoTranspose, Trans::Transpose, Algo::Gemm::Unblocked>::invoke(
+                team_member, 1, _J, _J, 1, _A
+            );
+        }
+    );
+    Kokkos::fence();
+}
+
+void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double **> &f, Kokkos::View<double **> &b) {
+    using namespace KokkosBatched;
+
+    Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
+
+    Kokkos::parallel_for(
+        "batched_gemv",
+        policy,
+        KOKKOS_LAMBDA (member_type team_member) {
+            uint64_t n = team_member.league_rank();
+            auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
+            auto _f = Kokkos::subview(f, Kokkos::ALL(), n);
+            auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
+            TeamGemv<member_type, Trans::NoTranspose, Algo::Gemv::Unblocked>::invoke(
+                team_member, -1, _J, _f, 0, _b
+            );
+        }
+    );
+    Kokkos::fence();
+}
+
+void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<int **> &ipiv) {
+    using namespace KokkosBatched;
+
+    Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
+
+    Kokkos::parallel_for(
+        "batched_gesv",
+        policy,
+        KOKKOS_LAMBDA (member_type team_member) {
+            uint64_t n = team_member.league_rank();
+            auto _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
+            auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
+            auto _ipiv = Kokkos::subview(ipiv, Kokkos::ALL(), n);
+            TeamGesv<member_type, Algo::Gemv::Unblocked>::invoke(
+                team_member, _A, _b, _b
+            );
+        }
+    );
     Kokkos::fence();
 }
 

@@ -78,18 +78,12 @@ int main(int argc, char **argv) {
         for (int i = 0; i < max_iter; i++) {
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
+
             // simple_copy_and_print_2d(x);
             // simple_copy_and_print_2d(f);
             // simple_copy_and_print_3d(J);
 
-            // compute A = J.T @ J
-            for (int n = 0; n < N; n++) {
-                auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
-                auto _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
-                KokkosBlas::gemm("N", "T", 1, _J, _J, 1, _A);
-            }
-            // check if kokkos-kernels needs fencing ?
-            Kokkos::fence();
+            batched_transposed_gemm(N, J, A);
 
             // compute b = -J.T @ f
             for (int n = 0; n < N; n++) {
@@ -99,6 +93,7 @@ int main(int argc, char **argv) {
                 KokkosBlas::gemv("N", -1, _J, _f, 0, _b);
             }
             Kokkos::fence();
+            batched_gemv(N, J, f, b);
 
             // simple_copy_and_print_3d(A);
             // simple_copy_and_print_2d(b);

@@ -1,7 +1,8 @@
 FROM rocm/dev-ubuntu-24.04
 
-RUN apt update -y && apt install -y build-essential cmake git ninja-build rocblas rocsolver
+RUN apt update -y && apt install -y build-essential cmake git ninja-build rocblas rocsolver rocprofiler-sdk-roctx
 
 WORKDIR /src
-ENTRYPOINT [ "/src/run", "--hip" ]
+ENTRYPOINT [ "/src/run", "--hip"]
+CMD [ "3 1 1" ]
 # ENTRYPOINT [ "bash" ]
