@@ -116,14 +116,19 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
             for (int k = 0; k < size; k += 1) {
                 bool factor_found = false;
                 // derivate product
+                // first, count the number of times our variable appears
+                // then, replace the last occurence with the corresponding integer
+                // (offset from the total param_count)
+                uint8_t count = 0;
+                uint64_t last_pos = 0;
                 for (int l = 0; l < stages; l++) {
                     uint8_t prod = equations.params(index + k, l);
-                    if (prod == j && !factor_found) {
-                        _factors.push_back(one_index);
+                    if (prod == j) {
+                        count += 1;
+                        last_pos = _factors.size();
                         factor_found = true;
-                    } else {
-                        _factors.push_back(prod); 
                     }
+                    _factors.push_back(prod);
                 }
                 
                 // if we didn't derivate yet, set product to 0
@@ -131,6 +136,8 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
                     _factors.resize(_factors.size() - stages);
                 } else {
                     local_products++;
+                    // replace last occurrence
+                    _factors[last_pos] = param_count + count - 1;
                 }
             }
             _equation_sizes[equation_i] = local_products;
@@ -139,6 +146,22 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
             equation_i++;
         }
     }
+
+    // std::cout << total_products << std::endl;
+    // for (int i = 0; i < _equation_sizes.size(); i++) {
+    //     std::cout << _equation_sizes[i] << "\t";
+    // }
+    // std::cout << std::endl;
+    // for (int i = 0; i < _equation_sizes.size(); i++) {
+    //     std::cout << _equation_indexes[i] << "\t";
+    // }
+    // std::cout << std::endl;
+
+    // for (int i = 0; i < _factors.size(); i++) {
+    //     if (!(i%stages) && i > 0) std::cout << std::endl;
+    //     std::cout << (int) _factors[i] << " ";
+    // }
+    // std::cout << std::endl;
 
     host_jacobian jacobian {
         decltype(host_jacobian::params)("", _factors.size() / stages, stages),

@@ -12,8 +12,8 @@ void init_x(Kokkos::View<double **> &x) {
         policy,
         KOKKOS_LAMBDA (uint64_t i, uint64_t j) {
             auto generator = random_pool.get_state();
-            // x(i, j) = generator.drand(-2.0, 2.0);
-            x(i, j) = 0.1 * (i+1);
+            x(i, j) = generator.drand(-2.0, 2.0);
+            // x(i, j) = 1.0 / (i+1);
             random_pool.free_state(generator);
         }
     );
@@ -84,8 +84,14 @@ void evaluate_jacobian(
             double prod = 1.0;
             for (int j = 0; j < stages; j++) {
                 uint8_t index = jacobian_d.params(i, j);
-                // multiply by one if we're out of the param range
-                if (index != total_params) prod *= x(index, n);
+                // if we're out of the param range, we need to multiply bu an integer corresponding 
+                // with a total_params offset
+                if (index >= total_params) {
+                    prod *= index - total_params + 1;
+                }
+                else {
+                    prod *= x(index, n);
+                }
             }
             red(i, n) = prod;
         }
@@ -144,7 +150,7 @@ void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double *
             auto _f = Kokkos::subview(f, Kokkos::ALL(), n);
             auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
             TeamVectorGemv<member_type, Trans::NoTranspose, Algo::Gemv::Unblocked>::invoke(
-                team_member, -1, J, f, 0, b
+                team_member, -1.0, J, f, 0.0, b
             );
         }
     );

@@ -92,20 +92,35 @@ int main(int argc, char **argv) {
             Kokkos::fence();
 
             // compute b = -J.T @ f
-            batched_gemv(N, J, f, b);
+            for (int n = 0; n < N; n++) {
+                auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
+                auto _f = Kokkos::subview(f, Kokkos::ALL(), n);
+                auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
+                KokkosBlas::gemv("N", -1, _J, _f, 0, _b);
+            }
+            // batched_gemv(N, J, f, b);
             Kokkos::fence();
 
             // simple_copy_and_print_3d(A);
             // simple_copy_and_print_2d(b);
 
             // solve A @ dx = b for dx
+            // for (int n = 0; n < N; n++) {
+            //     Kokkos::View<double **> _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
+            //     Kokkos::View<double *> _b = Kokkos::subview(b, Kokkos::ALL(), n);
+            //     Kokkos::View<int *> _ipiv = Kokkos::subview(ipiv, Kokkos::ALL(), n);
+            //     KokkosLapack::gesv(_A, _b, _ipiv);
+            // }
             batched_gesv(N, A, b, dx);
             Kokkos::fence();
+
+            // simple_copy_and_print_2d(dx);
+            // simple_copy_and_print_2d(b);
 
             update_weights(x, dx);
             Kokkos::fence();
 
-            if (!(i%1000)) {
+            if (!(i%1)) {
                 simple_copy_and_print_2d(f);
                 // simple_copy_and_print_2d(x);
                 // simple_copy_and_print_2d(b);
