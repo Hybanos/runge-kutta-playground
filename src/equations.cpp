@@ -34,10 +34,25 @@ host_equations build_equations(pool &p, uint8_t stages) {
             for (int i = 0; i < stages; i++) {
                 if (i < _phi.factors.size()) {
                     factor f = _phi.factors[i];
-                    if (f.type == 'a' && (*perm)[f.label_2 - 'i'] > (*perm)[f.label_1 - 'i']) is_zero = true; 
-                    if (f.type == 'c' && (*perm)[f.label_1 - 'i'] == 0) is_zero = true;
 
-                    factor f_perm = factor{f.type, (char) (*perm)[f.label_1 - 'i'], (char) (*perm)[f.label_2 - 'i']};
+                    if (f.type == 'a' && 
+                        (*perm)[f.label_2 - 'i'] >
+                        (*perm)[f.label_1 - 'i']) {
+                        is_zero = true;
+                    }
+
+                    if (f.type == 'c' && 
+                        (*perm)[f.label_1 - 'i'] == 0) {
+                        is_zero = true;
+                    }
+
+                    factor f_perm;
+                    if (f.type == 'b' || f.type == 'c') {
+                        f_perm = factor{f.type, (char) (*perm)[f.label_1 - 'i'], 0};
+                    } else {
+                        f_perm = factor{f.type, (char) (*perm)[f.label_1 - 'i'], (char) (*perm)[f.label_2 - 'i']};
+                    }
+
                     uint8_t ind = get_index(f_perm, stages);
 
                     // std::cout << f_perm.type << "_" << (int) f_perm.label_1 << "-" << (int) f_perm.label_2 << "\t" << (int) ind << std::endl;
@@ -191,7 +206,7 @@ void print_equations(uint8_t stages, host_equations &equations) {
                 if (l < stages - 1) std::cout << "*";
             }
             if (k < size - 1) std::cout << " + ";
-            else std::cout << " - 1/" << equations.facts[i];
+            else std::cout << " - " << equations.facts[i];
         }
         std::cout << std::endl;
     }    

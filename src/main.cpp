@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
             Kokkos::fence();
 
             if (!(i%1)) {
-                simple_copy_and_print_2d(f);
+                // simple_copy_and_print_2d(f);
                 // simple_copy_and_print_2d(x);
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);
