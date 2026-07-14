@@ -45,7 +45,7 @@ while True:
             b = -JJ.T @ ff
 
             # print("A:\n", A.T)
-            # print("det A:", np.linalg.det(A))
+            print("det A:", np.linalg.det(A))
             # print("b:\n", b.T)
 
             dx = np.linalg.solve(A, b)
@@ -58,4 +58,6 @@ while True:
     except Exception as e:
         x = np.random.random(6) * 4 - 2
         print("\n\n\n\n\n")
+        print("x:\n", x)
+        exit()
 
