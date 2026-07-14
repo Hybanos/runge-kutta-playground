@@ -192,6 +192,181 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
     return jacobian;
 }
 
+host_equations build_equations_or_get_cached(pool &p, uint8_t stages) {
+    if (!std::filesystem::exists("./cache/equations")) std::filesystem::create_directories("./cache/equations");
+
+    host_equations equations;
+
+    if (!std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_params")  ||
+        !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes")   ||
+        !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes") ||
+        !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_facts")
+    ) {
+        equations = build_equations(p, stages);
+        save_equations(stages, equations);
+    } else {
+        equations = load_equations(stages);
+    }
+    return equations;
+}
+
+host_jacobian build_jacobian_or_get_cached(pool &p, uint8_t stages, host_equations &equations) {
+    if (!std::filesystem::exists("./cache/jacobian")) std::filesystem::create_directories("./cache/jacobian");
+
+    host_jacobian jacobian;
+
+    if (!std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params")  ||
+        !std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes")   ||
+        !std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes")
+    ) {
+        jacobian = build_jacobian(p, stages, equations);
+        save_jacobian(stages, jacobian);
+    } else {
+        jacobian = load_jacobian(stages);
+    }
+    return jacobian;
+}
+
+void save_equations(uint8_t stages, host_equations &equations) {
+    std::ofstream f;
+    f.open("./cache/equations/s" + std::to_string((int) stages) + "_eq_params", std::ios::out | std::ios::binary);
+    for (uint64_t i = 0; i < equations.params.extent(0); i++) 
+        for (uint64_t j = 0; j < equations.params.extent(1); j++)
+        f.write(reinterpret_cast<const char *>(&equations.params(i, j)), sizeof(uint8_t));
+    f.close();
+
+    f.open("./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes", std::ios::out | std::ios::binary);
+    for (uint64_t i = 0; i < equations.sizes.size(); i++) 
+        f.write(reinterpret_cast<const char *>(&equations.sizes[i]), sizeof(uint32_t));
+    f.close();
+
+    f.open("./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes", std::ios::out | std::ios::binary);
+    for (uint64_t i = 0; i < equations.indexes.size(); i++) 
+        f.write(reinterpret_cast<const char *>(&equations.indexes[i]), sizeof(uint32_t));
+    f.close();
+
+    f.open("./cache/equations/s" + std::to_string((int) stages) + "_eq_facts", std::ios::out | std::ios::binary);
+    for (uint64_t i = 0; i < equations.facts.size(); i++) 
+        f.write(reinterpret_cast<const char *>(&equations.facts[i]), sizeof(double));
+    f.close();
+}
+
+void save_jacobian(uint8_t stages, host_jacobian &jacobian) {
+    std::ofstream f;
+    f.open("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params");
+    for (uint64_t i = 0; i < jacobian.params.extent(0); i++) 
+        for (uint64_t j = 0; j < jacobian.params.extent(1); j++)
+        f.write(reinterpret_cast<const char *>(&jacobian.params(i, j)), sizeof(uint8_t));
+    f.close();
+
+    f.open("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes", std::ios::out | std::ios::binary);
+    for (uint64_t i = 0; i < jacobian.sizes.size(); i++) 
+        f.write(reinterpret_cast<const char *>(&jacobian.sizes[i]), sizeof(uint32_t));
+    f.close();
+
+    f.open("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes", std::ios::out | std::ios::binary);
+    for (uint64_t i = 0; i < jacobian.indexes.size(); i++) 
+        f.write(reinterpret_cast<const char *>(&jacobian.indexes[i]), sizeof(uint32_t));
+    f.close();
+}
+
+host_equations load_equations(uint8_t stages) {
+    std::fstream f;
+    char * tmp;
+    std::string path;
+    uint64_t size;
+
+    path = "./cache/equations/s" + std::to_string((int) stages) + "_eq_params";
+    f.open(path);
+    size = std::filesystem::file_size(path) / sizeof(uint8_t);
+    auto params = decltype(host_equations::params)("tmp", size / stages, stages);
+    tmp = new char[size * sizeof(uint8_t)];
+    f.read(tmp, size * sizeof(uint8_t));
+    for (uint64_t i = 0; i < size; i++) params.data()[i] = ((uint8_t *)tmp)[i];
+    delete[] tmp;
+    f.close();
+
+    path = "./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes";
+    f.open(path);
+    size = std::filesystem::file_size(path) / sizeof(uint32_t);
+    auto sizes = decltype(host_equations::sizes)("tmp", size);
+    tmp = new char[size * sizeof(uint32_t)];
+    f.read(tmp, size * sizeof(uint32_t));
+    for (uint64_t i = 0; i < size; i++) sizes.data()[i] = ((uint32_t *)tmp)[i];
+    delete[] tmp;
+    f.close();
+
+    path = "./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes";
+    f.open(path);
+    size = std::filesystem::file_size(path) / sizeof(uint32_t);
+    auto indexes = decltype(host_equations::indexes)("tmp", size);
+    tmp = new char[size * sizeof(uint32_t)];
+    f.read(tmp, size * sizeof(uint32_t));
+    for (uint64_t i = 0; i < size; i++) indexes.data()[i] = ((uint32_t *)tmp)[i];
+    delete[] tmp;
+    f.close();
+
+    path = "./cache/equations/s" + std::to_string((int) stages) + "_eq_facts";
+    f.open(path);
+    size = std::filesystem::file_size(path) / sizeof(double);
+    auto facts = decltype(host_equations::facts)("tmp", size);
+    tmp = new char[size * sizeof(double)];
+    f.read(tmp, size * sizeof(double));
+    for (uint64_t i = 0; i < size; i++) facts.data()[i] = ((double *)tmp)[i];
+    delete[] tmp;
+    f.close();
+
+    return host_equations{
+        .params = params,
+        .sizes = sizes,
+        .indexes = indexes,
+        .facts = facts
+    };
+}
+
+host_jacobian load_jacobian(uint8_t stages) {
+    std::fstream f;
+    char * tmp;
+    std::string path;
+    uint64_t size;
+
+    path = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params";
+    f.open(path);
+    size = std::filesystem::file_size(path) / sizeof(uint8_t);
+    auto params = decltype(host_jacobian::params)("tmp", size / stages, stages);
+    tmp = new char[size * sizeof(uint8_t)];
+    f.read(tmp, size * sizeof(uint8_t));
+    for (uint64_t i = 0; i < size; i++) params.data()[i] = ((uint8_t *)tmp)[i];
+    delete[] tmp;
+    f.close();
+
+    path = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes";
+    f.open(path);
+    size = std::filesystem::file_size(path) / sizeof(uint32_t);
+    auto sizes = decltype(host_jacobian::sizes)("tmp", size);
+    tmp = new char[size * sizeof(uint32_t)];
+    f.read(tmp, size * sizeof(uint32_t));
+    for (uint64_t i = 0; i < size; i++) sizes.data()[i] = ((uint32_t *)tmp)[i];
+    delete[] tmp;
+    f.close();
+
+    path = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes";
+    f.open(path);
+    size = std::filesystem::file_size(path) / sizeof(uint32_t);
+    auto indexes = decltype(host_jacobian::indexes)("tmp", size);
+    tmp = new char[size * sizeof(uint32_t)];
+    f.read(tmp, size * sizeof(uint32_t));
+    for (uint64_t i = 0; i < size; i++) indexes.data()[i] = ((uint32_t *)tmp)[i];
+    delete[] tmp;
+    f.close();
+
+    return host_jacobian{
+        .params = params,
+        .sizes = sizes,
+        .indexes = indexes,
+    };
+}
+
 void print_equations(uint8_t stages, host_equations &equations) {
     std::cout << "=== Equations ===" << std::endl;
     for (int i = 0; i < equations.sizes.size(); i++) {

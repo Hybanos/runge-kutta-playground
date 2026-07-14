@@ -1,5 +1,6 @@
 build*/
 .vscode/
 ov1/
+cache/
 *.nsys*
 *.sqlite

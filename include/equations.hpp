@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 
 #include <Kokkos_Core.hpp>
 #include <Kokkos_Random.hpp>
@@ -114,8 +116,14 @@ __inline__ std::string get_factor(uint8_t index, uint8_t stages) {
     return "a_" + std::to_string((int) label_1 + 2) + std::to_string((int) label_2 + 1);
 }
 
+host_equations build_equations_or_get_cached(pool &p, uint8_t stages);
+host_jacobian build_jacobian_or_get_cached(pool &p, uint8_t stages, host_equations &equations);
 host_equations build_equations(pool &p, uint8_t stages);
 host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations);
+host_equations load_equations(uint8_t stages);
+host_jacobian load_jacobian(uint8_t stages);
+void save_equations(uint8_t stages, host_equations &equations);
+void save_jacobian(uint8_t stages, host_jacobian &jacobian);
 
 void print_equations(uint8_t stages, host_equations &equations);
 void print_jacobian(uint8_t stages, host_jacobian &jacobian);

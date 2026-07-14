@@ -12,6 +12,7 @@
 int main(int argc, char **argv) {
     Kokkos::initialize(argc, argv);
     {
+
         // generate trees
         uint64_t N = 1;
         uint8_t stages = 3;
@@ -26,8 +27,8 @@ int main(int argc, char **argv) {
         auto device_space = Kokkos::DefaultExecutionSpace();
 
         // build equation array and jacobian matrix 
-        host_equations equations_h = build_equations(p, stages);
-        host_jacobian jacobian_h = build_jacobian(p, stages, equations_h);
+        host_equations equations_h = build_equations_or_get_cached(p, stages);
+        host_jacobian jacobian_h = build_jacobian_or_get_cached(p, stages, equations_h);
 
         // print_equations(stages, equations_h);
         // print_jacobian(stages, jacobian_h);
