@@ -25,6 +25,7 @@ int main(int argc, char **argv) {
 
         uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
         auto device_space = Kokkos::DefaultExecutionSpace();
+        auto host_space = Kokkos::DefaultHostExecutionSpace();
 
         // build equation array and jacobian matrix 
         host_equations equations_h = build_equations_or_get_cached(p, stages);
@@ -64,7 +65,7 @@ int main(int argc, char **argv) {
         Kokkos::deep_copy(tmp_jacobian_alloc, jacobian_h.params);
         Kokkos::deep_copy(jacobian_d.params, tmp_jacobian_alloc);
 
-        Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.sizes.size(), N);
+        Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.total, N);
         Kokkos::View<double  **> jacobian_reduce("jc_reduce", jacobian_h.total, N);
 
         Kokkos::View<double  **> x("x", total_params, N);
@@ -94,9 +95,9 @@ int main(int argc, char **argv) {
 
             // compute b = -J.T @ f
             for (int n = 0; n < N; n++) {
-                auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
-                auto _f = Kokkos::subview(f, Kokkos::ALL(), n);
-                auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
+                auto _J = Kokkos::subview(J, Kokkos::ALL, Kokkos::ALL, n);
+                auto _f = Kokkos::subview(f, Kokkos::ALL, n);
+                auto _b = Kokkos::subview(b, Kokkos::ALL, n);
                 KokkosBlas::gemv("N", -1, _J, _f, 0, _b);
             }
             // batched_gemv(N, J, f, b);
@@ -107,28 +108,30 @@ int main(int argc, char **argv) {
 
             // solve A @ dx = b for dx
             // for (int n = 0; n < N; n++) {
-            //     Kokkos::View<double **> _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
-            //     Kokkos::View<double *> _b = Kokkos::subview(b, Kokkos::ALL(), n);
-            //     Kokkos::View<int *> _ipiv = Kokkos::subview(ipiv, Kokkos::ALL(), n);
+            //     Kokkos::View<double **> _A = Kokkos::subview(A, Kokkos::ALL, Kokkos::ALL, n);
+            //     Kokkos::View<double *>  _b = Kokkos::subview(b, Kokkos::ALL, n);
+            //     Kokkos::View<int *>  _ipiv = Kokkos::subview(ipiv, Kokkos::ALL, n);
             //     KokkosLapack::gesv(_A, _b, _ipiv);
             // }
             batched_gesv(N, A, b, dx);
             Kokkos::fence();
 
-            // simple_copy_and_print_2d(dx);
+            simple_copy_and_print_2d(dx);
             // simple_copy_and_print_2d(b);
 
+            // update x
             update_weights(x, dx);
             Kokkos::fence();
 
             if (!(i%1)) {
-                // simple_copy_and_print_2d(f);
-                // simple_copy_and_print_2d(x);
+                simple_copy_and_print_2d(f);
+                simple_copy_and_print_2d(x);
+                check_and_swap(N, f, x, total_params);
+                Kokkos::fence();
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);
             }
 
-            // update x
             // copy back and print f ?
         }
 

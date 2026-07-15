@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include <KokkosBatched_Gemm_Decl.hpp>
 #include <KokkosBatched_Gemv_Decl.hpp>
 #include <KokkosBatched_Gesv.hpp>
@@ -31,6 +33,7 @@ void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double *
 void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<double **> &x);
 void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT);
 void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx);
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, double tol);
 
 template<class T>
 void simple_copy_and_print_2d(Kokkos::View<T **> &v) {
@@ -42,9 +45,9 @@ void simple_copy_and_print_2d(Kokkos::View<T **> &v) {
 
     std::cout << "matrix: " << v.label() << std::endl;
     // print transposed
-    for (int j = 0; j < v.extent(0); j++) {
-        for (int i = 0; i < v.extent(1); i++) {
-            std::cout << copy(j, i) << "\t";
+    for (int i = 0; i < v.extent(0); i++) {
+        for (int j = 0; j < v.extent(1); j++) {
+            std::cout << copy(i, j) << "\t";
         }
         std::cout << std::endl;
     }

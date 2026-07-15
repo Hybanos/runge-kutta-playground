@@ -2,7 +2,7 @@ import sympy
 import numpy as np
 
 x = 1 / (np.arange(1, 7, 1))
-x = np.random.random(6) * 4 - 2
+# x = np.random.random(6) * 4 - 2
 print("x:\n", x.T)
 
 symbols = sympy.symbols("b1 b2 b3 c2 c3 a32")
@@ -34,22 +34,22 @@ lJ = sympy.lambdify(symbols, J)
 
 while True:
     try:
-        for i in range(10):
+        for i in range(1):
             ff = np.array(lf(*x))
             JJ = np.array(lJ(*x))
 
             print("f:\n", ff.T)
-            # print("J:\n", JJ.T)
+            print("J:\n", JJ.T)
 
             A = JJ.T @ JJ
             b = -JJ.T @ ff
 
-            # print("A:\n", A.T)
+            print("A:\n", A.T)
             print("det A:", np.linalg.det(A))
-            # print("b:\n", b.T)
+            print("b:\n", b.T)
 
             dx = np.linalg.solve(A, b)
-            # print("dx:\n", dx.T)
+            print("dx:\n", dx.T)
 
             x += dx
         exit(0)

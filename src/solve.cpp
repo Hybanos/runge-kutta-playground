@@ -56,10 +56,10 @@ void evaluate_equations(
         policy2,
         KOKKOS_LAMBDA (uint64_t eq, uint64_t n) {
             double sum = 0;
-                for (uint64_t i = 0; i < equations_d.sizes[eq]; i++) {
-                    sum += red(equations_d.indexes[eq] + i, n);
-                }
-                f(eq, n) = sum - equations_d.facts[eq];
+            for (uint64_t i = 0; i < equations_d.sizes[eq]; i++) {
+                sum += red(equations_d.indexes[eq] + i, n);
+            }
+            f(eq, n) = sum - equations_d.facts[eq];
         }
     );
 }
@@ -193,7 +193,43 @@ void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx) {
         "update_weights",
         policy,
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
-            x(i, n) += dx(i, n);
+            x(i, n) += Kokkos::max(Kokkos::abs(dx(i, n)), 1e-3) * (dx(i, n) / Kokkos::abs(dx(i, n)));
+        }
+    );
+}
+
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, double tol) {
+    Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
+    auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    Kokkos::Random_XorShift64_Pool<> random_pool(t);
+
+    Kokkos::parallel_for(
+        "check_and_swap",
+        policy,
+        KOKKOS_LAMBDA (const member_type &team_member) {
+            uint64_t n = team_member.league_rank();
+
+            double norm;
+            Kokkos::parallel_reduce(
+                Kokkos::TeamThreadRange(team_member, f.extent(0)),
+                [&] (uint64_t i, double &lnorm) {
+                    lnorm += f(i, n) * f(i, n);
+                },
+                norm
+            );
+            team_member.team_barrier();
+
+            // if (norm > tol * tol) Kokkos::printf("SWAP %i %i\n", team_member.league_rank(), team_member.league_size());
+
+            Kokkos::parallel_for(
+                Kokkos::TeamThreadRange(team_member, x.extent(0)),
+                [&] (uint64_t i) {
+                    auto generator = random_pool.get_state();
+                    if (norm > tol * tol) x(i, n) = generator.drand(-2.0, 2.0);
+                    random_pool.free_state(generator);
+                }
+            );
+            team_member.team_barrier();
         }
     );
 }
