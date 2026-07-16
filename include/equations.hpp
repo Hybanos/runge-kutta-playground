@@ -92,10 +92,8 @@ __inline__ uint8_t get_index(factor &f, uint8_t stages) {
 
 __inline__ std::string get_factor(uint8_t index, uint8_t stages) {
     uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
-    uint8_t zero_index = one_index + 1;
 
-    if (index == one_index) return "1";
-    if (index == zero_index) return "0";
+    if (index >= one_index) return std::to_string(index - one_index + 1);
 
     if (index < stages) 
         return "b_" + std::to_string((int) index);

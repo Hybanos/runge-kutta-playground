@@ -31,6 +31,9 @@ int main(int argc, char **argv) {
         host_equations equations_h = build_equations_or_get_cached(p, stages);
         host_jacobian jacobian_h = build_jacobian_or_get_cached(p, stages, equations_h);
 
+        host_equations _equations_h = build_equations(p, stages);
+        host_jacobian _jacobian_h = build_jacobian(p, stages, _equations_h);
+
         // print_equations(stages, equations_h);
         // print_jacobian(stages, jacobian_h);
 
@@ -80,14 +83,15 @@ int main(int argc, char **argv) {
         Kokkos::fence();
 
         for (int i = 0; i < max_iter; i++) {
+            auto t1 = std::chrono::high_resolution_clock::now();
             evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
             Kokkos::fence();
             evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
             Kokkos::fence();
 
-            // simple_copy_and_print_2d(x);
-            // simple_copy_and_print_2d(f);
-            // simple_copy_and_print_3d(J);
+            simple_copy_and_print_2d(x);
+            simple_copy_and_print_2d(f);
+            simple_copy_and_print_3d(J);
 
             // compute A = J.T @ J
             batched_transposed_gemm(N, J, A);
@@ -103,8 +107,8 @@ int main(int argc, char **argv) {
             // batched_gemv(N, J, f, b);
             Kokkos::fence();
 
-            // simple_copy_and_print_3d(A);
-            // simple_copy_and_print_2d(b);
+            simple_copy_and_print_3d(A);
+            simple_copy_and_print_2d(b);
 
             // solve A @ dx = b for dx
             // for (int n = 0; n < N; n++) {
@@ -117,7 +121,7 @@ int main(int argc, char **argv) {
             Kokkos::fence();
 
             simple_copy_and_print_2d(dx);
-            // simple_copy_and_print_2d(b);
+            simple_copy_and_print_2d(b);
 
             // update x
             update_weights(x, dx);
@@ -125,13 +129,14 @@ int main(int argc, char **argv) {
 
             if (!(i%1)) {
                 simple_copy_and_print_2d(f);
-                simple_copy_and_print_2d(x);
+                // simple_copy_and_print_2d(x);
                 check_and_swap(N, f, x, total_params);
                 Kokkos::fence();
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);
             }
-
+            auto t2 = std::chrono::high_resolution_clock::now();
+            std::cout << "ips: " << 1.0 / ((t2 - t1).count() / 1e9) * N << std::endl;
             // copy back and print f ?
         }
 

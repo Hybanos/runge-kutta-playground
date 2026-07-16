@@ -249,6 +249,10 @@ void save_equations(uint8_t stages, host_equations &equations) {
     for (uint64_t i = 0; i < equations.facts.size(); i++) 
         f.write(reinterpret_cast<const char *>(&equations.facts[i]), sizeof(double));
     f.close();
+
+    f.open("./cache/equations/s" + std::to_string((int) stages) + "_eq_total", std::ios::out | std::ios::binary);
+    f.write(reinterpret_cast<const char *>(&equations.total), sizeof(uint64_t));
+    f.close();
 }
 
 void save_jacobian(uint8_t stages, host_jacobian &jacobian) {
@@ -267,6 +271,10 @@ void save_jacobian(uint8_t stages, host_jacobian &jacobian) {
     f.open("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes", std::ios::out | std::ios::binary);
     for (uint64_t i = 0; i < jacobian.indexes.size(); i++) 
         f.write(reinterpret_cast<const char *>(&jacobian.indexes[i]), sizeof(uint32_t));
+    f.close();
+
+    f.open("./cache/equations/s" + std::to_string((int) stages) + "_jc_total", std::ios::out | std::ios::binary);
+    f.write(reinterpret_cast<const char *>(&jacobian.total), sizeof(uint64_t));
     f.close();
 }
 
@@ -316,11 +324,19 @@ host_equations load_equations(uint8_t stages) {
     delete[] tmp;
     f.close();
 
+    path = "./cache/equations/s" + std::to_string((int) stages) + "_eq_total";
+    f.open(path);
+    size = sizeof(uint64_t);
+    uint64_t total = 0;
+    f.read((char *) &total, size);
+    f.close();
+
     return host_equations{
         .params = params,
         .sizes = sizes,
         .indexes = indexes,
-        .facts = facts
+        .facts = facts,
+        .total = total
     };
 }
 
@@ -360,10 +376,18 @@ host_jacobian load_jacobian(uint8_t stages) {
     delete[] tmp;
     f.close();
 
+    path = "./cache/equations/s" + std::to_string((int) stages) + "_jc_total";
+    f.open(path);
+    size = sizeof(uint64_t);
+    uint64_t total = 0;
+    f.read((char *) &total, size);
+    f.close();
+
     return host_jacobian{
         .params = params,
         .sizes = sizes,
         .indexes = indexes,
+        .total = total
     };
 }
 
@@ -406,7 +430,7 @@ void print_jacobian(uint8_t stages, host_jacobian &jacobian) {
                 uint8_t prod = jacobian.params(index + k, l);
 
                 // std::cout << get_factor(prod, stages);
-                std::cout << (int) prod;
+                std::cout << get_factor(prod, stages);
                 if (l < stages - 1) std::cout << "*";
             }
             if (k < size - 1) std::cout << " + ";
