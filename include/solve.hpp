@@ -13,7 +13,6 @@ void init_x(Kokkos::View<double **> &x);
 
 void evaluate_equations(
     uint32_t N, uint8_t stages, 
-    host_equations &equations_h, 
     device_equations &equations_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
@@ -22,7 +21,6 @@ void evaluate_equations(
 
 void evaluate_jacobian(
     uint32_t N, uint8_t stages, 
-    host_jacobian &jacobian_h, 
     device_jacobian &jacobian_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
@@ -32,8 +30,31 @@ void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::Vi
 void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double **> &f, Kokkos::View<double **> &b);
 void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<double **> &x);
 void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT);
-void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx);
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, double tol);
+void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kokkos::View<double *> &alphas);
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &alphas, double tol);
+void backtrack(
+    uint64_t N, uint8_t stages, 
+    device_equations &equations_d, 
+    Kokkos::View<double **> &x,
+    Kokkos::View<double **> &red,
+    Kokkos::View<double **> &f,
+    Kokkos::View<double **> &f_tmp,
+    Kokkos::View<double **> &dx,
+    Kokkos::View<double **> &x_tmp,
+    Kokkos::View<double  *> &alphas
+);
+
+template<class T>
+void simple_copy_and_print_1d(Kokkos::View<T *> &v) {
+    auto tmp = Kokkos::create_mirror_view(v);
+    Kokkos::deep_copy(tmp, v);
+
+    std::cout << "matrix: " << v.label() << std::endl;
+    for (int i = 0; i < v.extent(0); i++) {
+        std::cout << tmp(i) << "\t";
+    }
+    std::cout << std::endl;
+}
 
 template<class T>
 void simple_copy_and_print_2d(Kokkos::View<T **> &v) {

@@ -2,6 +2,9 @@
 
 typedef Kokkos::TeamPolicy<>::member_type member_type;
 
+#define RANDOM_LB -2.0
+#define RANDOM_UB  2.0
+
 void init_x(Kokkos::View<double **> &x) {
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
     Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
@@ -12,7 +15,7 @@ void init_x(Kokkos::View<double **> &x) {
         policy,
         KOKKOS_LAMBDA (uint64_t i, uint64_t j) {
             auto generator = random_pool.get_state();
-            x(i, j) = generator.drand(-2.0, 2.0);
+            x(i, j) = generator.drand(RANDOM_LB, RANDOM_UB);
             // x(i, j) = 1.0 / (i+1);
             random_pool.free_state(generator);
         }
@@ -21,14 +24,13 @@ void init_x(Kokkos::View<double **> &x) {
 
 void evaluate_equations(    
     uint32_t N, uint8_t stages, 
-    host_equations &equations_h, 
     device_equations &equations_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
     Kokkos::View<double **> &f) {
 
     uint64_t begin[2] = {0, 0};
-    uint64_t end[2] = {equations_h.total, N};
+    uint64_t end[2] = {equations_d.total, N};
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy(begin, end);
     uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
 
@@ -50,7 +52,7 @@ void evaluate_equations(
     // simple_copy_and_print_2d(red);
     // Kokkos::fence();
 
-    Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy2({0, 0}, {(int) equations_h.sizes.size(), N});
+    Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy2({0, 0}, {(int) equations_d.sizes.size(), N});
     Kokkos::parallel_for(
         "equation_prod_reduce",
         policy2,
@@ -66,14 +68,13 @@ void evaluate_equations(
 
 void evaluate_jacobian(
     uint32_t N, uint8_t stages, 
-    host_jacobian &jacobian_h, 
     device_jacobian &jacobian_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
     Kokkos::View<double ***> &J) {
 
     uint64_t begin[2] = {0, 0};
-    uint64_t end[2] = {jacobian_h.total, N};
+    uint64_t end[2] = {jacobian_d.total, N};
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy(begin, end);
     uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
 
@@ -101,12 +102,12 @@ void evaluate_jacobian(
     // simple_copy_and_print_2d(red);
     // Kokkos::fence();
 
-    Kokkos::MDRangePolicy<Kokkos::Rank<3>> policy2({0, 0, 0}, {(int) total_params, (int) jacobian_h.sizes.size() / total_params, N});
+    Kokkos::MDRangePolicy<Kokkos::Rank<3>> policy2({0, 0, 0}, {(int) total_params, (int) jacobian_d.sizes.size() / total_params, N});
     Kokkos::parallel_for(
         "jacobian_prod_reduce",
         policy2,
         KOKKOS_LAMBDA (uint64_t derived, uint64_t eq, uint64_t n) {
-            uint64_t ind = derived * (jacobian_h.sizes.size() / total_params) + eq;
+            uint64_t ind = derived * (jacobian_d.sizes.size() / total_params) + eq;
             double sum = 0;
             for (uint64_t i = 0; i < jacobian_d.sizes[ind]; i++) {
                 sum += red(jacobian_d.indexes[ind] + i, n);
@@ -187,25 +188,26 @@ void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT) {
     );
 }
 
-void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx) {
+void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kokkos::View<double *> &alphas) {
+    double bound = 1e-3;
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
     Kokkos::parallel_for(
         "update_weights",
         policy,
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
-            x(i, n) += Kokkos::max(Kokkos::abs(dx(i, n)), 1e-3) * (dx(i, n) / Kokkos::abs(dx(i, n)));
+            // x(i, n) += Kokkos::max(Kokkos::abs(dx(i, n)), bound) * (dx(i, n) / Kokkos::abs(dx(i, n)));
+            x(i, n) += alphas(n) * dx(i, n);
         }
     );
 }
 
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, double tol) {
-    Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &alphas, double tol) {
     auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     Kokkos::Random_XorShift64_Pool<> random_pool(t);
 
     Kokkos::parallel_for(
         "check_and_swap",
-        policy,
+        Kokkos::TeamPolicy<>(N, Kokkos::AUTO()),
         KOKKOS_LAMBDA (const member_type &team_member) {
             uint64_t n = team_member.league_rank();
 
@@ -225,11 +227,81 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
                 Kokkos::TeamThreadRange(team_member, x.extent(0)),
                 [&] (uint64_t i) {
                     auto generator = random_pool.get_state();
-                    if (norm > tol * tol) x(i, n) = generator.drand(-2.0, 2.0);
+                    if (
+                        // norm > tol * tol ||
+                        // alphas(n) < 1e-12 ||
+                        Kokkos::isnan(f(0, n))
+
+                    ) {
+                            x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
+                        }
                     random_pool.free_state(generator);
                 }
             );
             team_member.team_barrier();
         }
     );
+}
+
+void backtrack(
+    uint64_t N, uint8_t stages, 
+    device_equations &equations_d, 
+    Kokkos::View<double **> &x,
+    Kokkos::View<double **> &red,
+    Kokkos::View<double **> &f,
+    Kokkos::View<double **> &f_tmp,
+    Kokkos::View<double **> &dx,
+    Kokkos::View<double **> &x_tmp,
+    Kokkos::View<double  *> &alphas
+) {
+    Kokkos::deep_copy(alphas, 10);
+
+    for (int backtrack_i = 0; backtrack_i < 10; backtrack_i++) {
+        Kokkos::parallel_for(
+            "x + alpha * dx",
+            Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {x.extent(0), N}),
+            KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
+                x_tmp(i, n) = x(i, n) + alphas(n) * dx(i, n);
+            }
+        );
+
+        evaluate_equations(N, stages, equations_d, x_tmp, red, f_tmp);
+
+        Kokkos::parallel_for(
+            "norms and compare",
+            Kokkos::TeamPolicy<>(N, Kokkos::AUTO()),
+            KOKKOS_LAMBDA (const member_type &team_member) {
+                uint64_t n = team_member.league_rank();
+
+                // custom reductor ?
+                double norm_1;
+                Kokkos::parallel_reduce(
+                    Kokkos::TeamThreadRange(team_member, f.extent(0)),
+                    [&] (uint64_t i, double &lnorm) {
+                        lnorm += f(i, n) * f(i, n);
+                    },
+                    norm_1
+                );
+                team_member.team_barrier();
+
+                double norm_2;
+                Kokkos::parallel_reduce(
+                    Kokkos::TeamThreadRange(team_member, f.extent(0)),
+                    [&] (uint64_t i, double &lnorm) {
+                        lnorm += f_tmp(i, n) * f_tmp(i, n);
+                    },
+                    norm_2
+                );
+                team_member.team_barrier();
+
+                norm_1 = Kokkos::sqrt(norm_1);
+                norm_2 = Kokkos::sqrt(norm_2);
+
+                if (norm_2 > (1 - 1e-6*alphas(n)) * norm_1) {
+                    alphas(n) *= 0.5;
+                }
+                team_member.team_barrier();
+            }
+        );
+    }
 }

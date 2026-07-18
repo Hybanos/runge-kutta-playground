@@ -31,9 +31,6 @@ int main(int argc, char **argv) {
         host_equations equations_h = build_equations_or_get_cached(p, stages);
         host_jacobian jacobian_h = build_jacobian_or_get_cached(p, stages, equations_h);
 
-        host_equations _equations_h = build_equations(p, stages);
-        host_jacobian _jacobian_h = build_jacobian(p, stages, _equations_h);
-
         // print_equations(stages, equations_h);
         // print_jacobian(stages, jacobian_h);
 
@@ -74,24 +71,29 @@ int main(int argc, char **argv) {
         Kokkos::View<double  **> x("x", total_params, N);
         Kokkos::View<int     **> ipiv("ipiv", total_params, N);
         Kokkos::View<double  **> f("f", equations_h.sizes.size(), N);
+        Kokkos::View<double  **> f_back("f_back", equations_h.sizes.size(), N);
         Kokkos::View<double ***> J("J", total_params, equations_h.sizes.size(), N);
         Kokkos::View<double ***> A("A", total_params, total_params, N);
         Kokkos::View<double  **> b("b", total_params, N);
         Kokkos::View<double  **> dx("dx", total_params, N);
+        Kokkos::View<double **> x_tmp("x_tmp", total_params, N);
+        Kokkos::View<double  **> norms("norms", total_params, N);
+        Kokkos::View<double   *> alphas("alphas", N);
 
         init_x(x);
+        Kokkos::deep_copy(alphas, 1.0);
         Kokkos::fence();
 
         for (int i = 0; i < max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
-            evaluate_equations(N, stages, equations_h, equations_d, x, equations_reduce, f);
+            evaluate_equations(N, stages, equations_d, x, equations_reduce, f);
             Kokkos::fence();
-            evaluate_jacobian(N, stages, jacobian_h, jacobian_d, x, jacobian_reduce, J);
+            evaluate_jacobian(N, stages, jacobian_d, x, jacobian_reduce, J);
             Kokkos::fence();
 
-            simple_copy_and_print_2d(x);
-            simple_copy_and_print_2d(f);
-            simple_copy_and_print_3d(J);
+            // simple_copy_and_print_2d(x);
+            // simple_copy_and_print_2d(f);
+            // simple_copy_and_print_3d(J);
 
             // compute A = J.T @ J
             batched_transposed_gemm(N, J, A);
@@ -107,36 +109,34 @@ int main(int argc, char **argv) {
             // batched_gemv(N, J, f, b);
             Kokkos::fence();
 
-            simple_copy_and_print_3d(A);
-            simple_copy_and_print_2d(b);
+            // simple_copy_and_print_3d(A);
+            // simple_copy_and_print_2d(b);
 
             // solve A @ dx = b for dx
-            // for (int n = 0; n < N; n++) {
-            //     Kokkos::View<double **> _A = Kokkos::subview(A, Kokkos::ALL, Kokkos::ALL, n);
-            //     Kokkos::View<double *>  _b = Kokkos::subview(b, Kokkos::ALL, n);
-            //     Kokkos::View<int *>  _ipiv = Kokkos::subview(ipiv, Kokkos::ALL, n);
-            //     KokkosLapack::gesv(_A, _b, _ipiv);
-            // }
             batched_gesv(N, A, b, dx);
             Kokkos::fence();
 
-            simple_copy_and_print_2d(dx);
-            simple_copy_and_print_2d(b);
+            // simple_copy_and_print_2d(dx);
+            // simple_copy_and_print_2d(b);
+
+            // backtrack
+            backtrack(N, stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas);
 
             // update x
-            update_weights(x, dx);
+            update_weights(x, dx, alphas);
             Kokkos::fence();
 
             if (!(i%1)) {
                 simple_copy_and_print_2d(f);
+                simple_copy_and_print_1d(alphas);
                 // simple_copy_and_print_2d(x);
-                check_and_swap(N, f, x, total_params);
+                check_and_swap(N, f, x, alphas, p.count_trees());
                 Kokkos::fence();
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);
             }
             auto t2 = std::chrono::high_resolution_clock::now();
-            std::cout << "ips: " << 1.0 / ((t2 - t1).count() / 1e9) * N << std::endl;
+            std::cout << i << " " << "ips: " << 1.0 / ((t2 - t1).count() / 1e9) * N << std::endl;
             // copy back and print f ?
         }
 
