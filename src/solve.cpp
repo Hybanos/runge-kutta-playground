@@ -228,7 +228,7 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
                 [&] (uint64_t i) {
                     auto generator = random_pool.get_state();
                     if (
-                        // norm > tol * tol ||
+                        norm > tol * tol ||
                         // alphas(n) < 1e-12 ||
                         Kokkos::isnan(f(0, n))
 
@@ -239,6 +239,27 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
                 }
             );
             team_member.team_barrier();
+        }
+    );
+}
+
+void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *> &norms) {
+    Kokkos::parallel_for(
+        "batched norms",
+        Kokkos::TeamPolicy<>(N, Kokkos::AUTO()),
+        KOKKOS_LAMBDA (const member_type &team_member) {
+            uint64_t n = team_member.league_rank();
+
+            // custom reductor ?
+            Kokkos::parallel_reduce(
+                Kokkos::TeamThreadRange(team_member, f.extent(0)),
+                [&] (uint64_t i, double &lnorm) {
+                    lnorm += f(i, n) * f(i, n);
+                },
+               norms(n)
+            );
+            team_member.team_barrier();
+            norms(n) = Kokkos::sqrt(norms(n));
         }
     );
 }
@@ -254,7 +275,7 @@ void backtrack(
     Kokkos::View<double **> &x_tmp,
     Kokkos::View<double  *> &alphas
 ) {
-    Kokkos::deep_copy(alphas, 10);
+    Kokkos::deep_copy(alphas, 100000000);
 
     for (int backtrack_i = 0; backtrack_i < 10; backtrack_i++) {
         Kokkos::parallel_for(
@@ -297,8 +318,8 @@ void backtrack(
                 norm_1 = Kokkos::sqrt(norm_1);
                 norm_2 = Kokkos::sqrt(norm_2);
 
-                if (norm_2 > (1 - 1e-6*alphas(n)) * norm_1) {
-                    alphas(n) *= 0.5;
+                if (norm_2 > (1 - 1e-10*alphas(n)) * norm_1) {
+                    alphas(n) *= 0.1;
                 }
                 team_member.team_barrier();
             }

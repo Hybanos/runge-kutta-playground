@@ -77,11 +77,10 @@ int main(int argc, char **argv) {
         Kokkos::View<double  **> b("b", total_params, N);
         Kokkos::View<double  **> dx("dx", total_params, N);
         Kokkos::View<double **> x_tmp("x_tmp", total_params, N);
-        Kokkos::View<double  **> norms("norms", total_params, N);
+        Kokkos::View<double   *> norms("norms", N);
         Kokkos::View<double   *> alphas("alphas", N);
 
         init_x(x);
-        Kokkos::deep_copy(alphas, 1.0);
         Kokkos::fence();
 
         for (int i = 0; i < max_iter; i++) {
@@ -127,10 +126,12 @@ int main(int argc, char **argv) {
             Kokkos::fence();
 
             if (!(i%1)) {
-                simple_copy_and_print_2d(f);
+                // simple_copy_and_print_2d(f);
+                batched_norms(N, f, norms);
+                simple_copy_and_print_1d(norms);
                 simple_copy_and_print_1d(alphas);
                 // simple_copy_and_print_2d(x);
-                check_and_swap(N, f, x, alphas, p.count_trees());
+                check_and_swap(N, f, x, alphas, p.count_trees() / 50);
                 Kokkos::fence();
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);
