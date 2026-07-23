@@ -275,9 +275,9 @@ void backtrack(
     Kokkos::View<double **> &x_tmp,
     Kokkos::View<double  *> &alphas
 ) {
-    Kokkos::deep_copy(alphas, 100000000);
+    Kokkos::deep_copy(alphas, 1e6);
 
-    for (int backtrack_i = 0; backtrack_i < 10; backtrack_i++) {
+    for (int backtrack_i = 0; backtrack_i < 5; backtrack_i++) {
         Kokkos::parallel_for(
             "x + alpha * dx",
             Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {x.extent(0), N}),
