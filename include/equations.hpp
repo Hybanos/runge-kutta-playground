@@ -9,6 +9,7 @@
 
 #include "tree.hpp"
 #include "combi.hpp"
+#include "io.hpp"
 
 template<class space>
 struct equation_block {

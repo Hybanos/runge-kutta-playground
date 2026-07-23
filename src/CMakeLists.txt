@@ -4,6 +4,7 @@ target_sources(main PRIVATE
     tree.cpp
     equations.cpp
     solve.cpp
+    tableau.cpp
 
     main.cpp
 )
