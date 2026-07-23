@@ -7,10 +7,13 @@ if [ -f /usr/bin/ninja ]; then
     build="-G Ninja"
 fi
 
-options="-DKokkos_ENABLE_OPENMP=ON"
-export OMP_NUM_THREADS=$(lscpu -p | egrep -v '^#' | sort -u -t, -k 2,4 | wc -l)
-export OMP_PROC_BIND=true
-export OMP_PLACES=cores
+if [[ $1 == "--omp" ]]; then
+    options="-DKokkos_ENABLE_OPENMP=ON"
+    # export OMP_NUM_THREADS=$(lscpu -p | egrep -v '^#' | sort -u -t, -k 2,4 | wc -l)
+    export OMP_NUM_THREADS=$(nproc)
+    export OMP_PROC_BIND=true
+    export OMP_PLACES=cores
+fi
 
 if [[ $1 == "--cuda" ]]; then
     options="-DKokkos_ENABLE_CUDA=ON -DKokkosKernels_ENABLE_TPL_CUBLAS=ON -DKokkosKernels_ENABLE_TPL_CUSOLVER=ON"

@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <initializer_list>
 
 #include <Kokkos_Core.hpp>
+#include <nlohmann/json.hpp>
 
 template<class T>
 void save_scalar(std::string path, T v) {
@@ -50,3 +50,11 @@ ViewType load_view(std::string path, Extents &&... extents) {
 
     return out;
 }
+
+void save_to_json(
+    uint64_t N,
+    uint8_t stages,
+    Kokkos::View<double **> &_x, 
+    Kokkos::View<double  *> &_norms, 
+    Kokkos::View<double  *> &_speeds
+);

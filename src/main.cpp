@@ -8,6 +8,7 @@
 #include "combi.hpp"
 #include "equations.hpp"
 #include "solve.hpp"
+#include "io.hpp"
 
 int main(int argc, char **argv) {
     Kokkos::initialize(argc, argv);
@@ -128,6 +129,7 @@ int main(int argc, char **argv) {
             check_and_swap(N, f, x, alphas, p.count_trees() / 1);
             Kokkos::fence();
 
+            if (!(i%50)) save_to_json(N, stages, x, norms, norms);
             if (!(i%1)) {
                 // simple_copy_and_print_2d(f);
                 batched_norms(N, f, norms);

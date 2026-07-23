@@ -65,6 +65,6 @@ class tree_iterator {
     public:
         tree_iterator(pool &_p) : p{_p} {}
         bool done() {return n >= p.size();}
-        const uint64_t operator*() {return n;}
+        uint64_t operator*() {return n;}
         void operator++() {next();}
 };

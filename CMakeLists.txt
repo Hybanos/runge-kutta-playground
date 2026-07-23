@@ -26,4 +26,11 @@ FetchContent_MakeAvailable(Kokkos-kernels)
 # set(BUILD_SHARED_LIBS ON CACHE BOOL "" FORCE)
 # FetchContent_MakeAvailable(Kokkos-tools)
 
+FetchContent_Declare(
+    json 
+    URL 
+    https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+)
+FetchContent_MakeAvailable(json)
+
 add_subdirectory(src)
