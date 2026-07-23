@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
         Kokkos::View<double ***> A("A", total_params, total_params, N);
         Kokkos::View<double  **> b("b", total_params, N);
         Kokkos::View<double  **> dx("dx", total_params, N);
-        Kokkos::View<double **> x_tmp("x_tmp", total_params, N);
+        Kokkos::View<double  **> x_tmp("x_tmp", total_params, N);
         Kokkos::View<double   *> norms("norms", N);
         Kokkos::View<double   *> alphas("alphas", N);
 
@@ -125,20 +125,20 @@ int main(int argc, char **argv) {
             update_weights(x, dx, alphas);
             Kokkos::fence();
 
+            check_and_swap(N, f, x, alphas, p.count_trees() / 1);
+            Kokkos::fence();
+
             if (!(i%1)) {
                 // simple_copy_and_print_2d(f);
                 batched_norms(N, f, norms);
                 simple_copy_and_print_1d(norms);
                 simple_copy_and_print_1d(alphas);
                 // simple_copy_and_print_2d(x);
-                check_and_swap(N, f, x, alphas, p.count_trees() / 50);
-                Kokkos::fence();
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);
+                auto t2 = std::chrono::high_resolution_clock::now();
+                std::cout << i << " " << "ips: " << 1.0 / ((t2 - t1).count() / 1e9) * N << std::endl;
             }
-            auto t2 = std::chrono::high_resolution_clock::now();
-            std::cout << i << " " << "ips: " << 1.0 / ((t2 - t1).count() / 1e9) * N << std::endl;
-            // copy back and print f ?
         }
 
     }
