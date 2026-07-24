@@ -24,7 +24,7 @@ void save_to_json(
     Kokkos::deep_copy(tmp_x, _x);
     Kokkos::deep_copy(x, tmp_x);
 
-    using json = nlohmann::json;
+    using json = nlohmann::ordered_json;
 
     auto j = json::array();
     for (uint64_t n = 0; n < N; n++) {
@@ -34,22 +34,40 @@ void save_to_json(
         auto b = json::array();
         auto c = json::array();
 
+        // b
         for (int i = 0; i < stages; i++) 
             b.push_back(x(b_offset + i, n));
 
+        // c
         c.push_back(0);
         for (int i = 0; i < stages - 1; i++) 
             c.push_back(x(c_offset + i, n));
 
+        // fill a with 0s
         for (int i = 0; i < stages; i++) {
             auto _a = json::array();
             for (int j = 0; j < stages; j++) {
-                if (i == 0 || j == 0) 
-                    _a.push_back(0);
-                else 
-                    _a.push_back(x(a_offset + (j * stages - 1) + i, n));
+                _a.push_back(0.0);
             }
             a.push_back(_a);
+        }
+
+        // fill a with vals
+        int ind = 0;
+        for (int i = 0; i < stages - 1; i++) {
+            for (int j = 0; j < i; j++) {
+                a[i+1][j+1] = x(a_offset + ind, n);
+                ind++;
+            }
+        }
+
+        // add a_x1
+        for (int i = 1; i < stages; i++) {
+            double sum = 0.0;
+            for (int j = 0; j < stages; j++) {
+                sum += a[i][j].get<double>();
+            }
+            a[i][0] = c[i].get<double>() - sum;
         }
 
         o["a"] = a;
