@@ -201,7 +201,7 @@ void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kok
     );
 }
 
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &alphas, double tol) {
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, double tol) {
     auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     Kokkos::Random_XorShift64_Pool<> random_pool(t);
 
@@ -221,14 +221,13 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
             );
             team_member.team_barrier();
 
-            // if (norm > tol * tol) Kokkos::printf("SWAP %i %i\n", team_member.league_rank(), team_member.league_size());
-
             Kokkos::parallel_for(
                 Kokkos::TeamThreadRange(team_member, x.extent(0)),
                 [&] (uint64_t i) {
                     auto generator = random_pool.get_state();
                     if (
                         norm > tol * tol ||
+                        speeds(n) < 1e-9 ||
                         // alphas(n) < 1e-12 ||
                         Kokkos::isnan(f(0, n))
 
@@ -260,6 +259,17 @@ void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *
             );
             team_member.team_barrier();
             norms(n) = Kokkos::sqrt(norms(n));
+        }
+    );
+}
+
+void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<double *> &norms_last, Kokkos::View<double *> &speeds) {
+    Kokkos::parallel_for(
+        "batched speeds",
+        Kokkos::RangePolicy(0, N),
+        KOKKOS_LAMBDA (uint64_t n) {
+            speeds(n) = norms_last(n) - norms(n);
+            norms_last(n) = norms(n);
         }
     );
 }
