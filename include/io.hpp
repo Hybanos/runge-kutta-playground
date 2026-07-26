@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <format>
+#include <iostream>
 
 #include <Kokkos_Core.hpp>
 #include <nlohmann/json.hpp>
@@ -53,6 +55,13 @@ ViewType load_view(std::string path, Extents &&... extents) {
 
 void save_to_json(
     uint64_t N,
+    uint8_t stages,
+    Kokkos::View<double **> &_x, 
+    Kokkos::View<double  *> &_norms, 
+    Kokkos::View<double  *> &_speeds
+);
+
+bool load_from_json(
     uint8_t stages,
     Kokkos::View<double **> &_x, 
     Kokkos::View<double  *> &_norms, 

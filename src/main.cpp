@@ -1,4 +1,5 @@
 #include <iostream>
+#include <filesystem>
 
 #include <Kokkos_Core.hpp>
 #include <KokkosBlas3_gemm.hpp>
@@ -66,10 +67,22 @@ int main(int argc, char **argv) {
         Kokkos::deep_copy(tmp_jacobian_alloc, jacobian_h.params);
         Kokkos::deep_copy(jacobian_d.params, tmp_jacobian_alloc);
 
+        Kokkos::View<double  **> x("x", total_params, N);
+        Kokkos::View<double   *> norms("norms", N);
+        Kokkos::View<double   *> speeds("speeds", N);
+
+        if (!load_from_json(stages, x, norms, speeds)) init_x(x);
+        Kokkos::fence();
+        N = norms.extent(0);
+        std::cout << N << std::endl;
+
+        simple_copy_and_print_2d(x);
+        save_to_json(N, stages, x, norms, speeds);
+        Kokkos::fence();
+
         Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.total, N);
         Kokkos::View<double  **> jacobian_reduce("jc_reduce", jacobian_h.total, N);
 
-        Kokkos::View<double  **> x("x", total_params, N);
         Kokkos::View<int     **> ipiv("ipiv", total_params, N);
         Kokkos::View<double  **> f("f", equations_h.sizes.size(), N);
         Kokkos::View<double  **> f_back("f_back", equations_h.sizes.size(), N);
@@ -78,13 +91,8 @@ int main(int argc, char **argv) {
         Kokkos::View<double  **> b("b", total_params, N);
         Kokkos::View<double  **> dx("dx", total_params, N);
         Kokkos::View<double  **> x_tmp("x_tmp", total_params, N);
-        Kokkos::View<double   *> norms("norms", N);
         Kokkos::View<double   *> norms_last("norms_last", N);
         Kokkos::View<double   *> alphas("alphas", N);
-        Kokkos::View<double   *> speeds("speeds", N);
-
-        init_x(x);
-        Kokkos::fence();
 
         for (int i = 0; i < max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -123,28 +131,39 @@ int main(int argc, char **argv) {
 
             // backtrack
             backtrack(N, stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas);
+            Kokkos::fence();
+            // Kokkos::deep_copy(alphas, 10);
 
             // update x
             update_weights(x, dx, alphas);
             Kokkos::fence();
 
-            check_and_swap(N, f, x, alphas, p.count_trees() / 1);
+            batched_norms(N, f, norms);
+            Kokkos::fence();
+            batched_speeds(N, norms, norms_last, speeds);
             Kokkos::fence();
 
-            if (!(i%1)) save_to_json(N, stages, x, norms, speeds);
+            check_and_swap(N, f, x, alphas, speeds, p.count_trees() / 1);
+            Kokkos::fence();
+
+            batched_norms(N, f, norms);
+            Kokkos::fence();
+            batched_speeds(N, norms, norms_last, speeds);
+            Kokkos::fence();
+
             if (!(i%1)) {
                 // simple_copy_and_print_2d(f);
-                batched_speeds(N, norms, norms_last, speeds);
-                batched_norms(N, f, norms);
-                Kokkos::fence();
                 simple_copy_and_print_1d(norms);
                 simple_copy_and_print_1d(alphas);
                 // simple_copy_and_print_2d(x);
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);
                 auto t2 = std::chrono::high_resolution_clock::now();
-                std::cout << i << " " << "ips: " << 1.0 / ((t2 - t1).count() / 1e9) * N << std::endl;
+                std::cout << i << " " << "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * N) << std::endl;
             }
+            Kokkos::fence();
+            if (!(i%1)) save_to_json(N, stages, x, norms, speeds);
+            Kokkos::fence();
         }
 
     }

@@ -7,8 +7,8 @@ typedef Kokkos::TeamPolicy<>::member_type member_type;
 
 void init_x(Kokkos::View<double **> &x) {
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
-    Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
-    // Kokkos::Random_XorShift64_Pool<> random_pool(2);
+    // Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
+    Kokkos::Random_XorShift64_Pool<> random_pool(52);
 
     Kokkos::parallel_for(
         "init",
@@ -122,6 +122,18 @@ void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::Vi
     using namespace KokkosBatched;
 
     Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
+    Kokkos::deep_copy(A, 0.0);
+    Kokkos::fence();
 
     Kokkos::parallel_for(
         "batched_transposed_gemm",
@@ -211,7 +223,7 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
         KOKKOS_LAMBDA (const member_type &team_member) {
             uint64_t n = team_member.league_rank();
 
-            double norm;
+            double norm = 0;
             Kokkos::parallel_reduce(
                 Kokkos::TeamThreadRange(team_member, f.extent(0)),
                 [&] (uint64_t i, double &lnorm) {
@@ -220,20 +232,22 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
                 norm
             );
             team_member.team_barrier();
+            norm = Kokkos::sqrt(norm);
+            // Kokkos::printf("wtf %f \n", norm);
 
             Kokkos::parallel_for(
                 Kokkos::TeamThreadRange(team_member, x.extent(0)),
                 [&] (uint64_t i) {
                     auto generator = random_pool.get_state();
                     if (
-                        norm > tol * tol ||
-                        speeds(n) < 1e-9 ||
-                        // alphas(n) < 1e-12 ||
-                        Kokkos::isnan(f(0, n))
-
+                        norm > tol ||
+                        // speeds(n) < 1e-9 ||
+                        // alphas(n) <= 1e-4 ||
+                        Kokkos::isnan(f(i, n))
                     ) {
-                            x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
-                        }
+                        x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
+                        // Kokkos::printf("haha %f %f ", norm, tol);
+                    }
                     random_pool.free_state(generator);
                 }
             );
@@ -285,7 +299,7 @@ void backtrack(
     Kokkos::View<double **> &x_tmp,
     Kokkos::View<double  *> &alphas
 ) {
-    Kokkos::deep_copy(alphas, 1e6);
+    Kokkos::deep_copy(alphas, 1e1);
 
     for (int backtrack_i = 0; backtrack_i < 10; backtrack_i++) {
         Kokkos::parallel_for(
@@ -328,7 +342,7 @@ void backtrack(
                 norm_1 = Kokkos::sqrt(norm_1);
                 norm_2 = Kokkos::sqrt(norm_2);
 
-                if (norm_2 > (1 - 1e-10*alphas(n)) * norm_1) {
+                if (norm_2 > (1 - 1e-4*alphas(n)) * norm_1) {
                     alphas(n) *= 0.1;
                 }
                 team_member.team_barrier();
