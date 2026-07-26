@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
         N = norms.extent(0);
         std::cout << N << std::endl;
 
-        simple_copy_and_print_2d(x);
+        // simple_copy_and_print_2d(x);
         save_to_json(N, stages, x, norms, speeds);
         Kokkos::fence();
 

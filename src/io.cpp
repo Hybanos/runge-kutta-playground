@@ -36,18 +36,18 @@ void save_to_json(
 
         // b
         for (int i = 0; i < stages; i++) 
-            b.push_back(std::format("{:.30f}", x(b_offset + i, n)));
+            b.push_back(x(b_offset + i, n));
 
         // c
         c.push_back("0.0");
         for (int i = 0; i < stages - 1; i++) 
-            c.push_back(std::format("{:.30f}", x(c_offset + i, n)));
+            c.push_back(x(c_offset + i, n));
 
         // fill a with 0s
         for (int i = 0; i < stages; i++) {
             auto _a = json::array();
             for (int j = 0; j < stages; j++) {
-                _a.push_back("0.0");
+                _a.push_back(0.0);
             }
             a.push_back(_a);
         }
@@ -56,19 +56,18 @@ void save_to_json(
         int ind = 0;
         for (int i = 0; i < stages - 1; i++) {
             for (int j = 0; j < i; j++) {
-                a[i+1][j+1] = std::format("{:.30}", x(a_offset + ind, n));
+                a[i+1][j+1] = x(a_offset + ind, n);
                 ind++;
             }
         }
-
 
         // add a_x1
         for (int i = 1; i < stages; i++) {
             double sum = 0.0;
             for (int j = 0; j < stages; j++) {
-                sum += std::stod(a[i][j].get<std::string>());
+                sum += a[i][j].get<double>();
             }
-            a[i][0] = std::format("{:.30}", std::stod(c[i].get<std::string>()) - sum);
+            a[i][0] = c[i].get<double>() - sum;
         }
 
         o["a"] = a;
@@ -123,15 +122,15 @@ bool load_from_json(
         speeds(n) = o[n]["speed"].get<double>();
 
         for (int i = 0; i < stages; i++)
-            x(b_offset + i, n) = std::stod(o[n]["b"][i].get<std::string>());
+            x(b_offset + i, n) = o[n]["b"][i].get<double>();
         
         for (int i = 0; i < stages - 1; i++)
-            x(c_offset + i, n) = std::stod(o[n]["c"][i + 1].get<std::string>());
+            x(c_offset + i, n) = o[n]["c"][i + 1].get<double>();
 
         int ind = 0;
         for (int i = 0; i < stages - 1; i++) {
             for (int j = 0; j < i; j++) {
-                x(a_offset + ind, n) = stod(o[n]["a"][i+1][j+1].get<std::string>());
+                x(a_offset + ind, n) = o[n]["a"][i+1][j+1].get<double>();
                 ind++;
             }
         }

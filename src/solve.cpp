@@ -7,8 +7,8 @@ typedef Kokkos::TeamPolicy<>::member_type member_type;
 
 void init_x(Kokkos::View<double **> &x) {
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
-    // Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
-    Kokkos::Random_XorShift64_Pool<> random_pool(52);
+    Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
+    // Kokkos::Random_XorShift64_Pool<> random_pool(52);
 
     Kokkos::parallel_for(
         "init",
@@ -29,14 +29,11 @@ void evaluate_equations(
     Kokkos::View<double **> &red, 
     Kokkos::View<double **> &f) {
 
-    uint64_t begin[2] = {0, 0};
-    uint64_t end[2] = {equations_d.total, N};
-    Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy(begin, end);
     uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
 
     Kokkos::parallel_for(
         "equation_prod_evaluate", 
-        policy, 
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {equations_d.total, (uint64_t) N}),
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             double prod = 1.0;
             for (int j = 0; j < stages; j++) {
@@ -52,15 +49,22 @@ void evaluate_equations(
     // simple_copy_and_print_2d(red);
     // Kokkos::fence();
 
-    Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy2({0, 0}, {(int) equations_d.sizes.size(), N});
     Kokkos::parallel_for(
-        "equation_prod_reduce",
-        policy2,
-        KOKKOS_LAMBDA (uint64_t eq, uint64_t n) {
+        "equations_prod_reduce",
+        Kokkos::TeamPolicy<>(N * equations_d.sizes.size(), Kokkos::AUTO()),
+        KOKKOS_LAMBDA (const member_type &team_member) {
+            uint64_t rank = team_member.league_rank();
+            uint64_t n = rank / equations_d.sizes.size();
+            uint64_t eq = rank % equations_d.sizes.size();
+
             double sum = 0;
-            for (uint64_t i = 0; i < equations_d.sizes[eq]; i++) {
-                sum += red(equations_d.indexes[eq] + i, n);
-            }
+            Kokkos::parallel_reduce(
+                Kokkos::TeamThreadRange(team_member, equations_d.sizes[eq]),
+                [&] (uint64_t i, double &lsum) {
+                    lsum += red(equations_d.indexes[eq] + i, n);
+                },
+                sum
+            );
             f(eq, n) = sum - equations_d.facts[eq];
         }
     );
@@ -115,6 +119,32 @@ void evaluate_jacobian(
             J(derived, eq, n) = sum;
         }
     );
+
+    // this doesn't really work :(
+
+    // Kokkos::parallel_for(
+    //     "jacobian_prod_reduce",
+    //     Kokkos::TeamPolicy<>(N * jacobian_d.sizes.size(), Kokkos::AUTO()),
+    //     KOKKOS_LAMBDA (const member_type &team_member) {
+    //         uint64_t rank = team_member.league_rank();
+    //         uint64_t n = rank / jacobian_d.sizes.size();
+    //         uint64_t tmp = rank % jacobian_d.sizes.size();
+    //         uint64_t eq = tmp / total_params;
+    //         uint64_t derived = tmp % total_params;
+
+    //         uint64_t ind = derived * (jacobian_d.sizes.size() / total_params) + eq;
+
+    //         double sum = 0;
+    //         Kokkos::parallel_reduce(
+    //             Kokkos::TeamThreadRange(team_member, jacobian_d.sizes[ind]),
+    //             [&] (uint64_t i, double &lsum) {
+    //                 lsum += red(jacobian_d.indexes[ind] + i, n);
+    //             },
+    //             sum
+    //         );
+    //         J(derived, eq, n) = sum;
+    //     }
+    // );
 
 }
 
@@ -299,7 +329,7 @@ void backtrack(
     Kokkos::View<double **> &x_tmp,
     Kokkos::View<double  *> &alphas
 ) {
-    Kokkos::deep_copy(alphas, 1e1);
+    Kokkos::deep_copy(alphas, 1e3);
 
     for (int backtrack_i = 0; backtrack_i < 10; backtrack_i++) {
         Kokkos::parallel_for(
@@ -342,7 +372,7 @@ void backtrack(
                 norm_1 = Kokkos::sqrt(norm_1);
                 norm_2 = Kokkos::sqrt(norm_2);
 
-                if (norm_2 > (1 - 1e-4*alphas(n)) * norm_1) {
+                if (norm_2 > (1 - 1e-10*alphas(n)) * norm_1) {
                     alphas(n) *= 0.1;
                 }
                 team_member.team_barrier();
