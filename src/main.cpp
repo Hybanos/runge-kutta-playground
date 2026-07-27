@@ -95,6 +95,8 @@ int main(int argc, char **argv) {
         Kokkos::View<double   *> norms_last("norms_last", N);
         Kokkos::View<double   *> alphas("alphas", N);
 
+        Kokkos::deep_copy(alphas, 1e-10);
+
         for (int i = 0; i < max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
             evaluate_equations(N, stages, equations_d, x, equations_reduce, f);

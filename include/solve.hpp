@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <format>
 
 #include <KokkosBatched_Gemm_Decl.hpp>
 #include <KokkosBatched_Gemv_Decl.hpp>
@@ -53,7 +54,7 @@ void simple_copy_and_print_1d(Kokkos::View<T *> &v) {
 
     std::cout << "matrix: " << v.label() << std::endl;
     for (int i = 0; i < v.extent(0); i++) {
-        std::cout << tmp(i) << "\t";
+        std::cout << std::format("{:<6.4g}", tmp(i)) << "\t";
     }
     std::cout << std::endl;
 }
@@ -70,7 +71,7 @@ void simple_copy_and_print_2d(Kokkos::View<T **> &v) {
     // print transposed
     for (int i = 0; i < v.extent(0); i++) {
         for (int j = 0; j < v.extent(1); j++) {
-            std::cout << copy(i, j) << "\t";
+            std::cout << std::format("{:10.10f}", copy(i, j)) << "\t";
         }
         std::cout << std::endl;
     }
@@ -90,7 +91,7 @@ void simple_copy_and_print_3d(Kokkos::View<T ***> &v) {
         std::cout << "layer n=" << n << std::endl;
         for (int i = 0; i < v.extent(0); i++) {
             for (int j = 0; j < v.extent(1); j++) {
-                std::cout << copy(i, j, n) << "\t";
+                std::cout << std::format("{:10.10f}", copy(i, j, n)) << "\t";
             }
             std::cout << std::endl;
         }

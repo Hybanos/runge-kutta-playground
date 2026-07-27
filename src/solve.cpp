@@ -260,8 +260,7 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
                     if (
                         norms(n) > upper_tol ||
                         norms(n) < lower_tol ||
-                        // speeds(n) < 1e-9 ||
-                        // alphas(n) <= 1e-4 ||
+                        alphas(n) <= 1e-12   ||
                         Kokkos::isnan(f(i, n))
                     ) {
                         x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
@@ -318,9 +317,17 @@ void backtrack(
     Kokkos::View<double **> &x_tmp,
     Kokkos::View<double  *> &alphas
 ) {
-    Kokkos::deep_copy(alphas, 1e3);
+    // Kokkos::deep_copy(alphas, 1e3);
 
-    for (int backtrack_i = 0; backtrack_i < 7; backtrack_i++) {
+    Kokkos::parallel_for(
+        "apha rescale",
+        Kokkos::RangePolicy(0, N),
+        KOKKOS_LAMBDA (uint64_t n) {
+            alphas(n) *= 10.0;
+        }
+    );
+
+    for (int backtrack_i = 0; backtrack_i < 3; backtrack_i++) {
         Kokkos::parallel_for(
             "x + alpha * dx",
             Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {x.extent(0), N}),
@@ -364,6 +371,7 @@ void backtrack(
                 norm_2 = Kokkos::sqrt(norm_2);
 
                 if (norm_2 > (1 - 1e-10*alphas(n)) * norm_1) {
+                    // if (alphas(n) > 1e-3) alphas(n) *= 0.8;
                     alphas(n) *= 0.1;
                 }
                 team_member.team_barrier();
