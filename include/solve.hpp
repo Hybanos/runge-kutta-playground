@@ -71,7 +71,7 @@ void simple_copy_and_print_2d(Kokkos::View<T **> &v) {
     // print transposed
     for (int i = 0; i < v.extent(0); i++) {
         for (int j = 0; j < v.extent(1); j++) {
-            std::cout << std::format("{:10.10f}", copy(i, j)) << "\t";
+            std::cout << fmt::format("{:10.10f}", copy(i, j)) << "\t";
         }
         std::cout << std::endl;
     }
@@ -91,7 +91,7 @@ void simple_copy_and_print_3d(Kokkos::View<T ***> &v) {
         std::cout << "layer n=" << n << std::endl;
         for (int i = 0; i < v.extent(0); i++) {
             for (int j = 0; j < v.extent(1); j++) {
-                std::cout << std::format("{:10.10f}", copy(i, j, n)) << "\t";
+                std::cout << fmt::format("{:10.10f}", copy(i, j, n)) << "\t";
             }
             std::cout << std::endl;
         }
