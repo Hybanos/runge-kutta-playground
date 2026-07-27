@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
         uint64_t N = 1;
         uint8_t stages = 3;
         uint64_t max_iter = 100;
-        double tol = 1e-6;
+        double tol = 1e-12;
         if (argc > 1) stages = std::stoi(argv[1]);
         if (argc > 2) N = std::stoi(argv[2]);
         if (argc > 3) max_iter = std::stoi(argv[3]);
