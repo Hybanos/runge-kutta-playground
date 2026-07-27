@@ -1,12 +1,12 @@
 #pragma once
 
 #include <chrono>
-#include <format>
 
 #include <KokkosBatched_Gemm_Decl.hpp>
 #include <KokkosBatched_Gemv_Decl.hpp>
 #include <KokkosBatched_Gesv.hpp>
 #include <KokkosBatched_Gesv_Impl.hpp>
+#include <fmt/format.h>
 
 #include "equations.hpp"
 
@@ -54,7 +54,7 @@ void simple_copy_and_print_1d(Kokkos::View<T *> &v) {
 
     std::cout << "matrix: " << v.label() << std::endl;
     for (int i = 0; i < v.extent(0); i++) {
-        std::cout << std::format("{:<6.4g}", tmp(i)) << "\t";
+        std::cout << fmt::format("{:<6.4g}", tmp(i)) << "\t";
     }
     std::cout << std::endl;
 }

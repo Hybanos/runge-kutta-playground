@@ -33,4 +33,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+FetchContent_Declare(
+    fmt 
+    GIT_REPOSITORY https://github.com/fmtlib/fmt 
+    GIT_TAG 12.2.0
+)
+FetchContent_MakeAvailable(fmt)
+
+
 add_subdirectory(src)
