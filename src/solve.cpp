@@ -172,7 +172,7 @@ void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::Vi
             uint64_t n = team_member.league_rank();
             auto _J = Kokkos::subview(J, Kokkos::ALL(), Kokkos::ALL(), n);
             auto _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
-            TeamVectorGemm<member_type, Trans::NoTranspose, Trans::Transpose, Algo::Gemm::Unblocked>::invoke(
+            TeamGemm<member_type, Trans::NoTranspose, Trans::Transpose, Algo::Gemm::Blocked>::invoke(
                 team_member, 1, _J, _J, 1, _A
             );
         }
@@ -243,7 +243,7 @@ void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kok
     );
 }
 
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, double tol) {
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, double upper_tol, double lower_tol) {
     auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     Kokkos::Random_XorShift64_Pool<> random_pool(t);
 
@@ -253,24 +253,13 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
         KOKKOS_LAMBDA (const member_type &team_member) {
             uint64_t n = team_member.league_rank();
 
-            double norm = 0;
-            Kokkos::parallel_reduce(
-                Kokkos::TeamThreadRange(team_member, f.extent(0)),
-                [&] (uint64_t i, double &lnorm) {
-                    lnorm += f(i, n) * f(i, n);
-                },
-                norm
-            );
-            team_member.team_barrier();
-            norm = Kokkos::sqrt(norm);
-            // Kokkos::printf("wtf %f \n", norm);
-
             Kokkos::parallel_for(
                 Kokkos::TeamThreadRange(team_member, x.extent(0)),
                 [&] (uint64_t i) {
                     auto generator = random_pool.get_state();
                     if (
-                        norm > tol ||
+                        norms(n) > upper_tol ||
+                        norms(n) < lower_tol ||
                         // speeds(n) < 1e-9 ||
                         // alphas(n) <= 1e-4 ||
                         Kokkos::isnan(f(i, n))
@@ -331,7 +320,7 @@ void backtrack(
 ) {
     Kokkos::deep_copy(alphas, 1e3);
 
-    for (int backtrack_i = 0; backtrack_i < 10; backtrack_i++) {
+    for (int backtrack_i = 0; backtrack_i < 7; backtrack_i++) {
         Kokkos::parallel_for(
             "x + alpha * dx",
             Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {x.extent(0), N}),
@@ -339,8 +328,10 @@ void backtrack(
                 x_tmp(i, n) = x(i, n) + alphas(n) * dx(i, n);
             }
         );
+        Kokkos::fence();
 
         evaluate_equations(N, stages, equations_d, x_tmp, red, f_tmp);
+        Kokkos::fence();
 
         Kokkos::parallel_for(
             "norms and compare",
@@ -378,5 +369,6 @@ void backtrack(
                 team_member.team_barrier();
             }
         );
+        Kokkos::fence();
     }
 }

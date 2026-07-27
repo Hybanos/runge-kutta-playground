@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <format>
 #include <iostream>
 
 #include <Kokkos_Core.hpp>
@@ -53,7 +52,8 @@ ViewType load_view(std::string path, Extents &&... extents) {
     return out;
 }
 
-void save_to_json(
+nlohmann::json to_json(uint8_t stages, Kokkos::View<double **> &x, uint64_t n);
+void save_checkpoint(
     uint64_t N,
     uint8_t stages,
     Kokkos::View<double **> &_x, 
@@ -61,9 +61,17 @@ void save_to_json(
     Kokkos::View<double  *> &_speeds
 );
 
-bool load_from_json(
+bool load_checkpoint(
     uint8_t stages,
     Kokkos::View<double **> &_x, 
     Kokkos::View<double  *> &_norms, 
     Kokkos::View<double  *> &_speeds
+);
+
+void append_solution(
+    uint64_t N,
+    uint8_t stages,
+    Kokkos::View<double **> &x,
+    Kokkos::View<double  *> &_norms,
+    double tol
 );

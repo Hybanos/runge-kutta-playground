@@ -1,6 +1,6 @@
 #include "io.hpp"
 
-void save_to_json(
+void save_checkpoint(
     uint64_t N,
     uint8_t stages,
     Kokkos::View<double **> &_x, 
@@ -8,7 +8,7 @@ void save_to_json(
     Kokkos::View<double  *> &_speeds
 ) {
 
-    if (!std::filesystem::exists("./cache/tableaux")) std::filesystem::create_directories("./cache/tableaux");
+    if (!std::filesystem::exists("./cache/tableaux/checkpoints")) std::filesystem::create_directories("./cache/tableaux/checkpoints/");
 
     uint8_t b_offset = 0;
     uint8_t c_offset = stages;
@@ -30,6 +30,10 @@ void save_to_json(
     for (uint64_t n = 0; n < N; n++) {
         json o;
 
+        uint8_t b_offset = 0;
+        uint8_t c_offset = stages;
+        uint8_t a_offset = stages * 2 - 1;
+
         auto a = json::array();
         auto b = json::array();
         auto c = json::array();
@@ -39,7 +43,7 @@ void save_to_json(
             b.push_back(x(b_offset + i, n));
 
         // c
-        c.push_back("0.0");
+        c.push_back(0.0);
         for (int i = 0; i < stages - 1; i++) 
             c.push_back(x(c_offset + i, n));
 
@@ -79,18 +83,19 @@ void save_to_json(
         j.push_back(o);
     } 
 
-    std::ofstream out("./cache/tableaux/s" + std::to_string((int) stages));
+    std::ofstream out("./cache/tableaux/checkpoints/s" + std::to_string((int) stages) + ".json");
     out << std::setw(4) << j << std::endl;
+    out.close();
 }
 
-bool load_from_json(
+bool load_checkpoint(
     uint8_t stages,
     Kokkos::View<double **> &_x, 
     Kokkos::View<double  *> &_norms, 
     Kokkos::View<double  *> &_speeds
 ) {
-    if (!std::filesystem::exists("./cache/tableaux")) std::filesystem::create_directories("./cache/tableaux");
-    std::string path = "./cache/tableaux/s" + std::to_string((int) stages);
+    if (!std::filesystem::exists("./cache/tableaux/checkpoints")) std::filesystem::create_directories("./cache/tableaux/checkpoints/");
+    std::string path = "./cache/tableaux/checkpoints/s" + std::to_string((int) stages) + ".json";
     if (!std::filesystem::exists(path)) return false;
 
     using json = nlohmann::ordered_json;
@@ -143,4 +148,104 @@ bool load_from_json(
     Kokkos::deep_copy(_speeds, speeds);
 
     return true;
+}
+
+void append_solution(
+    uint64_t N,
+    uint8_t stages,
+    Kokkos::View<double **> &_x,
+    Kokkos::View<double  *> &_norms,
+    double tol
+) {
+    if (!std::filesystem::exists("./cache/tableaux/solutions")) std::filesystem::create_directories("./cache/tableaux/solutions/");
+
+    using json = nlohmann::ordered_json;
+
+    uint8_t b_offset = 0;
+    uint8_t c_offset = stages;
+    uint8_t a_offset = stages * 2 - 1;
+
+    auto host_space = Kokkos::DefaultHostExecutionSpace();
+
+    auto x      = Kokkos::create_mirror_view(host_space, _x);
+    auto tmp_x  = Kokkos::create_mirror_view(host_space, _x);
+    auto norms  = Kokkos::create_mirror_view_and_copy(host_space, _norms);
+
+    Kokkos::fence();
+
+    Kokkos::deep_copy(tmp_x, _x);
+    Kokkos::deep_copy(x, tmp_x);
+
+    Kokkos::fence();
+
+    std::string path = "./cache/tableaux/solutions/s" + std::to_string((int) stages) + ".json";
+    json j;
+    if (std::filesystem::exists(path)) {
+        std::ifstream f;
+        f.open(path);
+        j = json::parse(f);
+        f.close();
+    } else {
+        j = json::array();
+    }
+
+    for (int n = 0; n < N; n++) {
+        if (norms(n) > tol || Kokkos::isnan(norms(n))) continue;
+        json o;
+
+        uint8_t b_offset = 0;
+        uint8_t c_offset = stages;
+        uint8_t a_offset = stages * 2 - 1;
+
+        auto a = json::array();
+        auto b = json::array();
+        auto c = json::array();
+
+        // b
+        for (int i = 0; i < stages; i++) 
+            b.push_back(x(b_offset + i, n));
+
+        // c
+        c.push_back(0.0);
+        for (int i = 0; i < stages - 1; i++) 
+            c.push_back(x(c_offset + i, n));
+
+        // fill a with 0s
+        for (int i = 0; i < stages; i++) {
+            auto _a = json::array();
+            for (int j = 0; j < stages; j++) {
+                _a.push_back(0.0);
+            }
+            a.push_back(_a);
+        }
+
+        // fill a with vals
+        int ind = 0;
+        for (int i = 0; i < stages - 1; i++) {
+            for (int j = 0; j < i; j++) {
+                a[i+1][j+1] = x(a_offset + ind, n);
+                ind++;
+            }
+        }
+
+        // add a_x1
+        for (int i = 1; i < stages; i++) {
+            double sum = 0.0;
+            for (int j = 0; j < stages; j++) {
+                sum += a[i][j].get<double>();
+            }
+            a[i][0] = c[i].get<double>() - sum;
+        }
+
+        o["a"] = a;
+        o["b"] = b;
+        o["c"] = c;
+        o["loss"] = norms(n);
+
+        j.push_back(o);
+    } 
+
+    std::ofstream out(path);
+    out << std::setw(2) << j << std::endl;
+    out.close();
 }

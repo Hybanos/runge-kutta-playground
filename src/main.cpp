@@ -19,6 +19,7 @@ int main(int argc, char **argv) {
         uint64_t N = 1;
         uint8_t stages = 3;
         uint64_t max_iter = 100;
+        double tol = 1e-6;
         if (argc > 1) stages = std::stoi(argv[1]);
         if (argc > 2) N = std::stoi(argv[2]);
         if (argc > 3) max_iter = std::stoi(argv[3]);
@@ -71,13 +72,13 @@ int main(int argc, char **argv) {
         Kokkos::View<double   *> norms("norms", N);
         Kokkos::View<double   *> speeds("speeds", N);
 
-        if (!load_from_json(stages, x, norms, speeds)) init_x(x);
+        if (!load_checkpoint(stages, x, norms, speeds)) init_x(x);
         Kokkos::fence();
         N = norms.extent(0);
         std::cout << N << std::endl;
 
         // simple_copy_and_print_2d(x);
-        save_to_json(N, stages, x, norms, speeds);
+        save_checkpoint(N, stages, x, norms, speeds);
         Kokkos::fence();
 
         Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.total, N);
@@ -143,12 +144,9 @@ int main(int argc, char **argv) {
             batched_speeds(N, norms, norms_last, speeds);
             Kokkos::fence();
 
-            check_and_swap(N, f, x, alphas, speeds, p.count_trees() / 1);
+            append_solution(N, stages, x, norms, tol);
             Kokkos::fence();
-
-            batched_norms(N, f, norms);
-            Kokkos::fence();
-            batched_speeds(N, norms, norms_last, speeds);
+            check_and_swap(N, f, x, norms, alphas, speeds, p.count_trees(), tol);
             Kokkos::fence();
 
             if (!(i%1)) {
@@ -162,7 +160,7 @@ int main(int argc, char **argv) {
                 std::cout << i << " " << "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * N) << std::endl;
             }
             Kokkos::fence();
-            if (!(i%1)) save_to_json(N, stages, x, norms, speeds);
+            if (!(i%1)) save_checkpoint(N, stages, x, norms, speeds);
             Kokkos::fence();
         }
 
