@@ -94,8 +94,10 @@ int main(int argc, char **argv) {
         Kokkos::View<double  **> x_tmp("x_tmp", total_params, N);
         Kokkos::View<double   *> norms_last("norms_last", N);
         Kokkos::View<double   *> alphas("alphas", N);
+        Kokkos::View<double   *> lambdas("lambdas", N);
 
         Kokkos::deep_copy(alphas, 1e-10);
+        Kokkos::deep_copy(lambdas, 1e-4);
 
         for (int i = 0; i < max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -126,7 +128,7 @@ int main(int argc, char **argv) {
             // simple_copy_and_print_2d(b);
 
             // Ghetto-Levenberg-Marquartdt
-            levenberg(N, A, 1e-4);
+            levenberg(N, A, lambdas, speeds);
             Kokkos::fence();
 
             // solve A @ dx = b for dx
@@ -158,7 +160,7 @@ int main(int argc, char **argv) {
             if (!(i%1)) {
                 // simple_copy_and_print_2d(f);
                 simple_copy_and_print_1d(norms);
-                simple_copy_and_print_1d(alphas);
+                simple_copy_and_print_1d(lambdas);
                 // simple_copy_and_print_2d(x);
                 // simple_copy_and_print_2d(b);
                 // simple_copy_and_print_2d(ipiv);

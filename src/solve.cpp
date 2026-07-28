@@ -306,12 +306,23 @@ void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<doub
     );
 }
 
-void levenberg(uint64_t N, Kokkos::View<double ***> &A, double lambda) {
+void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds) {
+    Kokkos::parallel_for(
+        "lambda rescale",
+        Kokkos::RangePolicy(0, N),
+        KOKKOS_LAMBDA (uint64_t n) {
+            // lambdas(n) *= speeds(n) < 0 ? 0.1 : 10;
+            lambdas(n) = speeds(n) * 100;
+        }
+    );
+
+    Kokkos::fence();
+
     Kokkos::parallel_for(
         "levenberg",
         Kokkos::MDRangePolicy({0, 0}, {A.extent(0), N}),
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
-            A(i, i, n) += lambda;
+            A(i, i, n) += lambdas(n);
         }
     );
 }
