@@ -125,6 +125,10 @@ int main(int argc, char **argv) {
             // simple_copy_and_print_3d(A);
             // simple_copy_and_print_2d(b);
 
+            // Ghetto-Levenberg-Marquartdt
+            levenberg(N, A, 1e-4);
+            Kokkos::fence();
+
             // solve A @ dx = b for dx
             batched_gesv(N, A, b, dx);
             Kokkos::fence();
@@ -133,9 +137,9 @@ int main(int argc, char **argv) {
             // simple_copy_and_print_2d(b);
 
             // backtrack
-            backtrack(N, stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas);
-            Kokkos::fence();
-            // Kokkos::deep_copy(alphas, 10);
+            // backtrack(N, stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas);
+            // Kokkos::fence();
+            Kokkos::deep_copy(alphas, 1);
 
             // update x
             update_weights(x, dx, alphas);
@@ -162,7 +166,7 @@ int main(int argc, char **argv) {
                 std::cout << i << " " << "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * N) << std::endl;
             }
             Kokkos::fence();
-            if (!(i%1)) save_checkpoint(N, stages, x, norms, speeds);
+            if (!(i%10)) save_checkpoint(N, stages, x, norms, speeds);
             Kokkos::fence();
         }
 

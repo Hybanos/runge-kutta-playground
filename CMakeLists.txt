@@ -40,5 +40,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fmt)
 
+FetchContent_Declare(
+    cli11
+    GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+    GIT_TAG v2.6.2
+)
+FetchContent_MakeAvailable(cli11)
+
 
 add_subdirectory(src)
