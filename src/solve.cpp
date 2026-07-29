@@ -312,7 +312,7 @@ void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &
         Kokkos::RangePolicy(0, N),
         KOKKOS_LAMBDA (uint64_t n) {
             // lambdas(n) *= speeds(n) < 0 ? 0.1 : 10;
-            lambdas(n) = speeds(n) * 100;
+            lambdas(n) = Kokkos::abs(speeds(n) * 100 + lambdas(n)) / 2;
         }
     );
 
