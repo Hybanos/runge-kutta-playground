@@ -18,6 +18,7 @@ struct config {
     uint64_t max_iter = 0;
     uint64_t checkpoint_save_freq = 100;
     uint64_t print_freq = 1;
+    uint64_t solution_count = 0;
     double accept_tol = 1e-12;
 
     bool dump_equations = false;
@@ -43,6 +44,7 @@ int main(int argc, char **argv) {
         app.add_option("-i,--max_iter", c.max_iter, "Maximum number of iterations");
         app.add_option("--checkpoint-save-freq", c.checkpoint_save_freq, "Number of iterations between checkpoint json save");
         app.add_option("--print-freq", c.print_freq, "Number of iterations between norms print");
+        app.add_option("--solution-count", c.solution_count, "Number of solutions to find before exiting the program");
         app.add_option("--accept-tol", c.accept_tol, "Residual norm under which the method is accepted");
 
         app.add_flag("--dump-equations", c.dump_equations, "Print equations and Jacobian");
@@ -184,7 +186,7 @@ int main(int argc, char **argv) {
             batched_speeds(c.N, norms, norms_last, speeds);
             Kokkos::fence();
 
-            append_solution(c.N, c.stages, x, norms, c.accept_tol);
+            if (append_solution(c.N, c.stages, x, norms, c.accept_tol) >= c.solution_count) break;
             Kokkos::fence();
             check_and_swap(c.N, f, x, norms, alphas, speeds, p.count_trees(), c.accept_tol);
             Kokkos::fence();

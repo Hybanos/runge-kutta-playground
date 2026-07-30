@@ -156,7 +156,7 @@ bool load_checkpoint(
     return true;
 }
 
-void append_solution(
+uint64_t append_solution(
     uint64_t N,
     uint8_t stages,
     Kokkos::View<double **> &_x,
@@ -166,6 +166,8 @@ void append_solution(
     if (!std::filesystem::exists("./cache/tableaux/solutions")) std::filesystem::create_directories("./cache/tableaux/solutions/");
 
     using json = nlohmann::ordered_json;
+
+    uint64_t out_size;
 
     uint8_t b_offset = 0;
     uint8_t c_offset = stages;
@@ -254,4 +256,6 @@ void append_solution(
     std::ofstream out(path);
     out << std::setw(2) << j << std::endl;
     out.close();
+
+    return j.size();
 }

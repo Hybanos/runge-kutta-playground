@@ -52,7 +52,7 @@ ViewType load_view(std::string path, Extents &&... extents) {
     return out;
 }
 
-nlohmann::json to_json(uint8_t stages, Kokkos::View<double **> &x, uint64_t n);
+// nlohmann::json to_json(uint8_t stages, Kokkos::View<double **> &x, uint64_t n);
 void wipe_checkpoint(uint8_t stages);
 void save_checkpoint(
     uint64_t N,
@@ -69,7 +69,7 @@ bool load_checkpoint(
     Kokkos::View<double  *> &_speeds
 );
 
-void append_solution(
+uint64_t append_solution(
     uint64_t N,
     uint8_t stages,
     Kokkos::View<double **> &x,
