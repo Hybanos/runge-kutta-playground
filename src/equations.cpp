@@ -295,7 +295,7 @@ void print_equations(uint8_t stages, host_equations &equations) {
 }
 
 void print_jacobian(uint8_t stages, host_jacobian &jacobian) {
-    uint8_t param_count = (stages - 1) / (stages - 2) / 2 + stages + stages - 1;
+    uint8_t param_count = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
     int derivation_param = -1;
 
     std::cout << "=== Jacobian ===" << std::endl;

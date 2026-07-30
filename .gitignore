@@ -5,3 +5,4 @@ ov1/
 cache/
 *.nsys*
 *.sqlite
+*.txt

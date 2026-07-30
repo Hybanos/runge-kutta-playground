@@ -4,6 +4,7 @@
 #include <Kokkos_Core.hpp>
 #include <KokkosBlas3_gemm.hpp>
 #include <KokkosLapack_gesv.hpp>
+#include <CLI/CLI.hpp>
 
 #include "tree.hpp"
 #include "combi.hpp"
@@ -11,31 +12,59 @@
 #include "solve.hpp"
 #include "io.hpp"
 
+struct config {
+    uint64_t N = 0;
+    uint8_t stages = 3;
+    uint64_t max_iter = 0;
+    uint64_t checkpoint_save_freq = 100;
+    uint64_t print_freq = 1;
+    double accept_tol = 1e-12;
+
+    bool dump_equations = false;
+    bool dump_state = false;
+
+    bool wipe_checkpoint = false;
+};
+
 int main(int argc, char **argv) {
     Kokkos::initialize(argc, argv);
     {
 
-        // generate trees
-        uint64_t N = 1;
-        uint8_t stages = 3;
-        uint64_t max_iter = 100;
-        double tol = 1e-12;
-        if (argc > 1) stages = std::stoi(argv[1]);
-        if (argc > 2) N = std::stoi(argv[2]);
-        if (argc > 3) max_iter = std::stoi(argv[3]);
-        pool p;
-        p.gen(stages);
+        config c;
+        CLI::App app("rkp");
+        argv = app.ensure_utf8(argv);
 
-        uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
+        app.add_flag("--omp");
+        app.add_flag("--hip");
+        app.add_flag("--cuda");
+
+        app.add_option("-N,-n", c.N, "Number of tableaux to compute in parallel");
+        app.add_option("-s,--stages", c.stages, "Stages of the method");
+        app.add_option("-i,--max_iter", c.max_iter, "Maximum number of iterations");
+        app.add_option("--checkpoint-save-freq", c.checkpoint_save_freq, "Number of iterations between checkpoint json save");
+        app.add_option("--print-freq", c.print_freq, "Number of iterations between norms print");
+        app.add_option("-i,--max_iter", c.max_iter, "Maximum number of iterations");
+        app.add_option("--accept-tol", c.accept_tol, "Residual norm under which the method is accepted");
+
+        app.add_flag("--dump-equations", c.dump_equations, "Print equations and Jacobian");
+        app.add_flag("--dump-state", c.dump_state, "Print values used while computing");
+        app.add_flag("--wipe", c.wipe_checkpoint, "Clears previously saved checkpoints");
+
+        app.set_help_flag("-h,--help", "?");
+
+        CLI11_PARSE(app, argc, argv);
+
+        // generate trees
+        pool p;
+        p.gen(c.stages);
+
+        uint8_t total_params = (c.stages - 1) * (c.stages - 2) / 2 + c.stages + c.stages - 1;
         auto device_space = Kokkos::DefaultExecutionSpace();
         auto host_space = Kokkos::DefaultHostExecutionSpace();
 
         // build equation array and jacobian matrix 
-        host_equations equations_h = build_equations_or_get_cached(p, stages);
-        host_jacobian jacobian_h = build_jacobian_or_get_cached(p, stages, equations_h);
-
-        // print_equations(stages, equations_h);
-        // print_jacobian(stages, jacobian_h);
+        host_equations equations_h = build_equations_or_get_cached(p, c.stages);
+        host_jacobian jacobian_h = build_jacobian_or_get_cached(p, c.stages, equations_h);
 
         // copy
         device_equations equations_d {
@@ -53,12 +82,23 @@ int main(int argc, char **argv) {
             .total = jacobian_h.total
         };
 
-        // std::cout << "==" << std::endl;
-        // for (int i = 0; i < jacobian_h.sizes.size(); i++) {
-        //     std::cout << jacobian_h.indexes[i] << "\t" << jacobian_h.sizes[i] << std::endl;
-        // }
-        // std::cout << jacobian_h.total << std::endl;
-        // std::cout << "==" << std::endl;
+        if (c.dump_equations) {
+            print_equations(c.stages, equations_h);
+            print_jacobian(c.stages, jacobian_h);
+
+            std::cout << "= Equations (index, size) =" << std::endl;
+            for (int i = 0; i < equations_h.sizes.size(); i++) {
+                std::cout << equations_h.indexes[i] << "\t" << equations_h.sizes[i] << std::endl;
+            }
+            std::cout << equations_h.total << std::endl;
+            std::cout << "==" << std::endl;
+            std::cout << "= Jacobian (index, size) =" << std::endl;
+            for (int i = 0; i < jacobian_h.sizes.size(); i++) {
+                std::cout << jacobian_h.indexes[i] << "\t" << jacobian_h.sizes[i] << std::endl;
+            }
+            std::cout << jacobian_h.total << std::endl;
+            std::cout << "==" << std::endl;
+        }
 
         auto tmp_equation_alloc = Kokkos::create_mirror_view(equations_d.params);
         Kokkos::deep_copy(tmp_equation_alloc, equations_h.params);
@@ -68,54 +108,47 @@ int main(int argc, char **argv) {
         Kokkos::deep_copy(tmp_jacobian_alloc, jacobian_h.params);
         Kokkos::deep_copy(jacobian_d.params, tmp_jacobian_alloc);
 
-        Kokkos::View<double  **> x("x", total_params, N);
-        Kokkos::View<double   *> norms("norms", N);
-        Kokkos::View<double   *> speeds("speeds", N);
+        Kokkos::View<double  **> x("x", total_params, c.N);
+        Kokkos::View<double   *> norms("norms", c.N);
+        Kokkos::View<double   *> speeds("speeds", c.N);
 
-        if (!load_checkpoint(stages, x, norms, speeds)) init_x(x);
+        if (c.wipe_checkpoint) wipe_checkpoint(c.stages);
+        if (!load_checkpoint(c.stages, x, norms, speeds)) init_x(x);
         Kokkos::fence();
-        N = norms.extent(0);
-        std::cout << N << std::endl;
+        c.N = norms.extent(0);
 
-        // simple_copy_and_print_2d(x);
-        save_checkpoint(N, stages, x, norms, speeds);
-        Kokkos::fence();
+        Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.total, c.N);
+        Kokkos::View<double  **> jacobian_reduce("jc_reduce", jacobian_h.total, c.N);
 
-        Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.total, N);
-        Kokkos::View<double  **> jacobian_reduce("jc_reduce", jacobian_h.total, N);
-
-        Kokkos::View<int     **> ipiv("ipiv", total_params, N);
-        Kokkos::View<double  **> f("f", equations_h.sizes.size(), N);
-        Kokkos::View<double  **> f_back("f_back", equations_h.sizes.size(), N);
-        Kokkos::View<double ***> J("J", total_params, equations_h.sizes.size(), N);
-        Kokkos::View<double ***> A("A", total_params, total_params, N);
-        Kokkos::View<double  **> b("b", total_params, N);
-        Kokkos::View<double  **> dx("dx", total_params, N);
-        Kokkos::View<double  **> x_tmp("x_tmp", total_params, N);
-        Kokkos::View<double   *> norms_last("norms_last", N);
-        Kokkos::View<double   *> alphas("alphas", N);
-        Kokkos::View<double   *> lambdas("lambdas", N);
+        Kokkos::View<int     **> ipiv("ipiv", total_params, c.N);
+        Kokkos::View<double  **> f("f", equations_h.sizes.size(), c.N);
+        Kokkos::View<double  **> f_back("f_back", equations_h.sizes.size(), c.N);
+        Kokkos::View<double ***> J("J", total_params, equations_h.sizes.size(), c.N);
+        Kokkos::View<double ***> A("A", total_params, total_params, c.N);
+        Kokkos::View<double  **> b("b", total_params, c.N);
+        Kokkos::View<double  **> dx("dx", total_params, c.N);
+        Kokkos::View<double  **> x_tmp("x_tmp", total_params, c.N);
+        Kokkos::View<double   *> norms_last("norms_last", c.N);
+        Kokkos::View<double   *> alphas("alphas", c.N);
+        Kokkos::View<double   *> lambdas("lambdas", c.N);
 
         Kokkos::deep_copy(alphas, 1e-10);
         Kokkos::deep_copy(lambdas, 1e-4);
 
-        for (int i = 0; i < max_iter; i++) {
+        for (int i = 0; i < c.max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
-            evaluate_equations(N, stages, equations_d, x, equations_reduce, f);
+            evaluate_equations(c.N, c.stages, equations_d, x, equations_reduce, f);
             Kokkos::fence();
-            evaluate_jacobian(N, stages, jacobian_d, x, jacobian_reduce, J);
+            evaluate_jacobian(c.N, c.stages, jacobian_d, x, jacobian_reduce, J);
             Kokkos::fence();
 
-            // simple_copy_and_print_2d(x);
-            // simple_copy_and_print_2d(f);
-            // simple_copy_and_print_3d(J);
 
             // compute A = J.T @ J
-            batched_transposed_gemm(N, J, A);
+            batched_transposed_gemm(c.N, J, A);
             Kokkos::fence();
 
             // compute b = -J.T @ f
-            for (int n = 0; n < N; n++) {
+            for (int n = 0; n < c.N; n++) {
                 auto _J = Kokkos::subview(J, Kokkos::ALL, Kokkos::ALL, n);
                 auto _f = Kokkos::subview(f, Kokkos::ALL, n);
                 auto _b = Kokkos::subview(b, Kokkos::ALL, n);
@@ -124,19 +157,22 @@ int main(int argc, char **argv) {
             // batched_gemv(N, J, f, b);
             Kokkos::fence();
 
-            // simple_copy_and_print_3d(A);
-            // simple_copy_and_print_2d(b);
-
             // Ghetto-Levenberg-Marquartdt
-            levenberg(N, A, lambdas, speeds);
+            levenberg(c.N, A, lambdas, speeds);
             Kokkos::fence();
 
             // solve A @ dx = b for dx
-            batched_gesv(N, A, b, dx);
+            batched_gesv(c.N, A, b, dx);
             Kokkos::fence();
 
-            // simple_copy_and_print_2d(dx);
-            // simple_copy_and_print_2d(b);
+            if (c.dump_state) {
+                simple_copy_and_print_2d(x);
+                simple_copy_and_print_2d(f);
+                simple_copy_and_print_3d(J);
+                simple_copy_and_print_3d(A);
+                simple_copy_and_print_2d(b);
+                simple_copy_and_print_2d(dx);
+            }
 
             // backtrack
             // backtrack(N, stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas);
@@ -147,28 +183,26 @@ int main(int argc, char **argv) {
             update_weights(x, dx, alphas);
             Kokkos::fence();
 
-            batched_norms(N, f, norms);
+            batched_norms(c.N, f, norms);
             Kokkos::fence();
-            batched_speeds(N, norms, norms_last, speeds);
-            Kokkos::fence();
-
-            append_solution(N, stages, x, norms, tol);
-            Kokkos::fence();
-            check_and_swap(N, f, x, norms, alphas, speeds, p.count_trees(), tol);
+            batched_speeds(c.N, norms, norms_last, speeds);
             Kokkos::fence();
 
-            if (!(i%1)) {
-                // simple_copy_and_print_2d(f);
+            append_solution(c.N, c.stages, x, norms, c.accept_tol);
+            Kokkos::fence();
+            check_and_swap(c.N, f, x, norms, alphas, speeds, p.count_trees(), c.accept_tol);
+            Kokkos::fence();
+
+            if (!(i%c.print_freq)) {
+                
                 simple_copy_and_print_1d(norms);
                 simple_copy_and_print_1d(lambdas);
-                // simple_copy_and_print_2d(x);
-                // simple_copy_and_print_2d(b);
-                // simple_copy_and_print_2d(ipiv);
+
                 auto t2 = std::chrono::high_resolution_clock::now();
-                std::cout << i << " " << "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * N) << std::endl;
+                std::cout << i << " " << "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * c.N) << std::endl;
             }
             Kokkos::fence();
-            if (!(i%10)) save_checkpoint(N, stages, x, norms, speeds);
+            if (!(i%c.checkpoint_save_freq)) save_checkpoint(c.N, c.stages, x, norms, speeds);
             Kokkos::fence();
         }
 

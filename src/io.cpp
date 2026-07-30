@@ -1,5 +1,11 @@
 #include "io.hpp"
 
+void wipe_checkpoint(uint8_t stages) {
+    if (!std::filesystem::exists("./cache/tableaux/checkpoints")) std::filesystem::create_directories("./cache/tableaux/checkpoints/");
+    std::string path = "./cache/tableaux/checkpoints/s" + std::to_string((int) stages) + ".json";
+    if (std::filesystem::exists(path)) std::filesystem::remove(path);
+}
+
 void save_checkpoint(
     uint64_t N,
     uint8_t stages,
