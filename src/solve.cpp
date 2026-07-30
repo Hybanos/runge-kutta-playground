@@ -230,7 +230,7 @@ void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT) {
     );
 }
 
-void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kokkos::View<double *> &alphas) {
+void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kokkos::View<double *> &alphas, Kokkos::View<uint8_t  *> &accept) {
     double bound = 1e-3;
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
     Kokkos::parallel_for(
@@ -238,7 +238,7 @@ void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kok
         policy,
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             // x(i, n) += Kokkos::max(Kokkos::abs(dx(i, n)), bound) * (dx(i, n) / Kokkos::abs(dx(i, n)));
-            x(i, n) += alphas(n) * dx(i, n);
+            x(i, n) += alphas(n) * dx(i, n) * accept(n);
         }
     );
 }
@@ -336,7 +336,8 @@ void backtrack(
     Kokkos::View<double **> &f_tmp,
     Kokkos::View<double **> &dx,
     Kokkos::View<double **> &x_tmp,
-    Kokkos::View<double  *> &alphas
+    Kokkos::View<double  *> &alphas,
+    Kokkos::View<uint8_t  *> &accept
 ) {
     // Kokkos::deep_copy(alphas, 1e3);
 
@@ -394,6 +395,7 @@ void backtrack(
                 if (norm_2 > (1 - 1e-10*alphas(n)) * norm_1) {
                     // if (alphas(n) > 1e-3) alphas(n) *= 0.8;
                     alphas(n) *= 0.1;
+                    if (backtrack_i == 2) accept(n) = false;
                 }
                 team_member.team_barrier();
             }

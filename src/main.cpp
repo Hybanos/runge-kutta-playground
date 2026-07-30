@@ -43,7 +43,6 @@ int main(int argc, char **argv) {
         app.add_option("-i,--max_iter", c.max_iter, "Maximum number of iterations");
         app.add_option("--checkpoint-save-freq", c.checkpoint_save_freq, "Number of iterations between checkpoint json save");
         app.add_option("--print-freq", c.print_freq, "Number of iterations between norms print");
-        app.add_option("-i,--max_iter", c.max_iter, "Maximum number of iterations");
         app.add_option("--accept-tol", c.accept_tol, "Residual norm under which the method is accepted");
 
         app.add_flag("--dump-equations", c.dump_equations, "Print equations and Jacobian");
@@ -131,6 +130,7 @@ int main(int argc, char **argv) {
         Kokkos::View<double   *> norms_last("norms_last", c.N);
         Kokkos::View<double   *> alphas("alphas", c.N);
         Kokkos::View<double   *> lambdas("lambdas", c.N);
+        Kokkos::View<uint8_t  *> accept("accept", c.N);
 
         Kokkos::deep_copy(alphas, 1e-10);
         Kokkos::deep_copy(lambdas, 1e-4);
@@ -138,14 +138,11 @@ int main(int argc, char **argv) {
         for (int i = 0; i < c.max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
             evaluate_equations(c.N, c.stages, equations_d, x, equations_reduce, f);
-            Kokkos::fence();
             evaluate_jacobian(c.N, c.stages, jacobian_d, x, jacobian_reduce, J);
             Kokkos::fence();
 
-
             // compute A = J.T @ J
             batched_transposed_gemm(c.N, J, A);
-            Kokkos::fence();
 
             // compute b = -J.T @ f
             for (int n = 0; n < c.N; n++) {
@@ -159,7 +156,6 @@ int main(int argc, char **argv) {
 
             // Ghetto-Levenberg-Marquartdt
             levenberg(c.N, A, lambdas, speeds);
-            Kokkos::fence();
 
             // solve A @ dx = b for dx
             batched_gesv(c.N, A, b, dx);
@@ -175,16 +171,16 @@ int main(int argc, char **argv) {
             }
 
             // backtrack
-            // backtrack(N, stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas);
-            // Kokkos::fence();
-            Kokkos::deep_copy(alphas, 1);
+            Kokkos::deep_copy(accept, 1.0);
+            backtrack(c.N, c.stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas, accept);
+            Kokkos::fence();
+            // Kokkos::deep_copy(alphas, 1);
 
             // update x
-            update_weights(x, dx, alphas);
+            update_weights(x, dx, alphas, accept);
             Kokkos::fence();
 
             batched_norms(c.N, f, norms);
-            Kokkos::fence();
             batched_speeds(c.N, norms, norms_last, speeds);
             Kokkos::fence();
 
@@ -197,6 +193,7 @@ int main(int argc, char **argv) {
                 
                 simple_copy_and_print_1d(norms);
                 simple_copy_and_print_1d(lambdas);
+                simple_copy_and_print_1d(alphas);
 
                 auto t2 = std::chrono::high_resolution_clock::now();
                 std::cout << i << " " << "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * c.N) << std::endl;
