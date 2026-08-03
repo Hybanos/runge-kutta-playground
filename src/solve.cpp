@@ -243,7 +243,7 @@ void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kok
     );
 }
 
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, double upper_tol, double lower_tol) {
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, Kokkos::View<uint64_t *> ttl, uint64_t max_ttl, double upper_tol, double lower_tol) {
     auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     Kokkos::Random_XorShift64_Pool<> random_pool(t);
 
@@ -252,6 +252,7 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
         Kokkos::TeamPolicy<>(N, Kokkos::AUTO()),
         KOKKOS_LAMBDA (const member_type &team_member) {
             uint64_t n = team_member.league_rank();
+            ttl(n) += 1;
 
             Kokkos::parallel_for(
                 Kokkos::TeamThreadRange(team_member, x.extent(0)),
@@ -261,9 +262,11 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
                         norms(n) > upper_tol ||
                         norms(n) < lower_tol ||
                         alphas(n) <= 1e-12   ||
+                        ttl(n) > max_ttl     ||
                         Kokkos::isnan(f(i, n))
                     ) {
                         x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
+                        ttl(n) = 0;
                         // Kokkos::printf("haha %f %f ", norm, tol);
                     }
                     random_pool.free_state(generator);

@@ -32,7 +32,7 @@ void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double *
 void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<double **> &x);
 void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT);
 void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kokkos::View<double *> &alphas, Kokkos::View<uint8_t  *> &accept);
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, double upper_tol, double lower_tol);
+void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, Kokkos::View<uint64_t *> ttl, uint64_t max_ttl, double upper_tol, double lower_tol);
 void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *> &norms);
 void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<double *> &norms_last, Kokkos::View<double *> &speeds);
 void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds);

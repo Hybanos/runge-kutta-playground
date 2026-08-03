@@ -15,10 +15,11 @@
 struct config {
     uint64_t N = 0;
     uint8_t stages = 3;
-    uint64_t max_iter = 0;
+    uint64_t max_iter = -1;
     uint64_t checkpoint_save_freq = 100;
     uint64_t print_freq = 1;
     uint64_t solution_count = 0;
+    uint64_t ttl = -1;
     double accept_tol = 1e-12;
 
     bool dump_equations = false;
@@ -45,6 +46,7 @@ int main(int argc, char **argv) {
         app.add_option("--checkpoint-save-freq", c.checkpoint_save_freq, "Number of iterations between checkpoint json save");
         app.add_option("--print-freq", c.print_freq, "Number of iterations between norms print");
         app.add_option("--solution-count", c.solution_count, "Number of solutions to find before exiting the program");
+        app.add_option("--ttl", c.ttl, "Maximum number of lived iterations before being reset");
         app.add_option("--accept-tol", c.accept_tol, "Residual norm under which the method is accepted");
 
         app.add_flag("--dump-equations", c.dump_equations, "Print equations and Jacobian");
@@ -133,7 +135,9 @@ int main(int argc, char **argv) {
         Kokkos::View<double   *> alphas("alphas", c.N);
         Kokkos::View<double   *> lambdas("lambdas", c.N);
         Kokkos::View<uint8_t  *> accept("accept", c.N);
+        Kokkos::View<uint64_t *> ttl("ttl", c.N);
 
+        Kokkos::deep_copy(ttl, 0);
         Kokkos::deep_copy(alphas, 1e-10);
         Kokkos::deep_copy(lambdas, 1e-4);
 
@@ -188,7 +192,7 @@ int main(int argc, char **argv) {
 
             if (append_solution(c.N, c.stages, x, norms, c.accept_tol) >= c.solution_count) break;
             Kokkos::fence();
-            check_and_swap(c.N, f, x, norms, alphas, speeds, p.count_trees(), c.accept_tol);
+            check_and_swap(c.N, f, x, norms, alphas, speeds, ttl, c.ttl, p.count_trees(), c.accept_tol);
             Kokkos::fence();
 
             if (!(i%c.print_freq)) {
