@@ -10,10 +10,13 @@ global stages
 stages = int(sys.argv[1])
 param_count = stages * 2 + stages * stages
 
+v1 = 0
+v2 = stages + 2
+v3 = stages + 1
 
 def read_params():
     data = ""
-    with open(f"./cache/tableaux/s{stages}", "r") as f:
+    with open(f"./cache/tableaux/checkpoints/s{stages}.json", "r") as f:
         data = f.read()
 
     j = json.loads(data)
@@ -43,7 +46,7 @@ def read_params():
 
 def update_plot(frame):
     params, losses = read_params()
-    p._offsets3d = (params[:, 0], params[:, 1], params[:, 2])
+    p._offsets3d = (params[:, v1], params[:, v2], params[:, v3])
     p.set_array(losses)
     # p.set_clim(losses.min(), losses.max())
     # cbar.update_normal(p)
@@ -56,8 +59,8 @@ ax = fig.add_subplot(projection="3d")
 ax.set_xlim(-10, 10)
 ax.set_ylim(-10, 10)
 ax.set_zlim(-10, 10)
-norm = colors.LogNorm(vmin=1e-3, vmax=1e1)
-p = ax.scatter(params[:, 0], params[:, 1], params[:, 2], c=losses, norm=norm)
+norm = colors.LogNorm(vmin=1e-6, vmax=1e3)
+p = ax.scatter(params[:, v1], params[:, v2], params[:, v3], c=losses, norm=norm)
 cbar = fig.colorbar(p, ax=ax)
 
 ani = FuncAnimation(fig, update_plot, interval=1000)

@@ -5,6 +5,7 @@
 #include <KokkosBlas3_gemm.hpp>
 #include <KokkosLapack_gesv.hpp>
 #include <CLI/CLI.hpp>
+#include <thread>
 
 #include "tree.hpp"
 #include "combi.hpp"
@@ -12,7 +13,7 @@
 #include "solve.hpp"
 #include "io.hpp"
 
-struct config {
+struct config_t {
     uint64_t N = 0;
     uint8_t stages = 3;
     uint64_t max_iter = -1;
@@ -32,7 +33,7 @@ int main(int argc, char **argv) {
     Kokkos::initialize(argc, argv);
     {
 
-        config c;
+        config_t c;
         CLI::App app("rkp");
         argv = app.ensure_utf8(argv);
 
@@ -69,22 +70,6 @@ int main(int argc, char **argv) {
         host_equations equations_h = build_equations_or_get_cached(p, c.stages);
         host_jacobian jacobian_h = build_jacobian_or_get_cached(p, c.stages, equations_h);
 
-        // copy
-        device_equations equations_d {
-            .params = decltype(device_equations::params)("eq_param_d", equations_h.params.extents()),
-            .sizes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.sizes, "eq_sizes_d"),
-            .indexes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.indexes, "eq_indexes_d"),
-            .facts = Kokkos::create_mirror_view_and_copy(device_space, equations_h.facts, "eq_facts_d"),
-            .total = equations_h.total
-        };
-
-        device_jacobian jacobian_d {
-            .params = decltype(device_jacobian::params)("jc_param_d", jacobian_h.params.extents()),
-            .sizes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.sizes, "jd_sizes_d"),
-            .indexes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.indexes, "jc_indexes_d"),
-            .total = jacobian_h.total
-        };
-
         if (c.dump_equations) {
             print_equations(c.stages, equations_h);
             print_jacobian(c.stages, jacobian_h);
@@ -102,6 +87,22 @@ int main(int argc, char **argv) {
             std::cout << jacobian_h.total << std::endl;
             std::cout << "==" << std::endl;
         }
+
+        // copy
+        device_equations equations_d {
+            .params = decltype(device_equations::params)("eq_param_d", equations_h.params.extents()),
+            .sizes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.sizes, "eq_sizes_d"),
+            .indexes = Kokkos::create_mirror_view_and_copy(device_space, equations_h.indexes, "eq_indexes_d"),
+            .facts = Kokkos::create_mirror_view_and_copy(device_space, equations_h.facts, "eq_facts_d"),
+            .total = equations_h.total
+        };
+
+        device_jacobian jacobian_d {
+            .params = decltype(device_jacobian::params)("jc_param_d", jacobian_h.params.extents()),
+            .sizes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.sizes, "jd_sizes_d"),
+            .indexes = Kokkos::create_mirror_view_and_copy(device_space, jacobian_h.indexes, "jc_indexes_d"),
+            .total = jacobian_h.total
+        };
 
         auto tmp_equation_alloc = Kokkos::create_mirror_view(equations_d.params);
         Kokkos::deep_copy(tmp_equation_alloc, equations_h.params);
@@ -207,8 +208,8 @@ int main(int argc, char **argv) {
             Kokkos::fence();
             if (!(i%c.checkpoint_save_freq)) save_checkpoint(c.N, c.stages, x, norms, speeds);
             Kokkos::fence();
+            // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
-
     }
     Kokkos::finalize();
 
