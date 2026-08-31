@@ -25,6 +25,9 @@ struct config_t {
 
     double accept_tol = 1e-12;
 
+    bool use_backtrack = true;
+    bool use_levenberg = true;
+
     bool dump_equations = false;
     bool dump_state = false;
 
@@ -42,6 +45,9 @@ int main(int argc, char **argv) {
         app.add_flag("--omp");
         app.add_flag("--hip");
         app.add_flag("--cuda");
+
+        app.add_flag_callback("--no-backtrack", [&](){c.use_backtrack = false;});
+        app.add_flag_callback("--no-levenberg", [&](){c.use_levenberg = false;});
 
         app.add_option("-N,-n", c.N, "Number of tableaux to compute in parallel");
         app.add_option("-s,--stages", c.stages, "Stages of the method");
@@ -165,7 +171,7 @@ int main(int argc, char **argv) {
             Kokkos::fence();
 
             // Ghetto-Levenberg-Marquartdt
-            levenberg(c.N, A, lambdas, speeds);
+            if (c.use_levenberg) levenberg(c.N, A, lambdas, speeds);
 
             // solve A @ dx = b for dx
             batched_gesv(c.N, A, b, dx);
@@ -182,9 +188,12 @@ int main(int argc, char **argv) {
 
             // backtrack
             Kokkos::deep_copy(accept, 1.0);
-            // backtrack(c.N, c.stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas, accept);
+            if (c.use_backtrack) {
+                backtrack(c.N, c.stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas, accept);
+            } else {
+                Kokkos::deep_copy(alphas, 1);
+            }
             Kokkos::fence();
-            Kokkos::deep_copy(alphas, 1);
 
             // update x
             update_weights(x, dx, alphas, accept);
