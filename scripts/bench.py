@@ -28,8 +28,9 @@ def run(name):
     plt.xlabel("stages")
     plt.ylabel("time (s)")
     plt.title(f"{name} generation time")
-    plt.errorbar(i, means, yerr=sigmas, capsize=3)
+    plt.errorbar(i, means, yerr=sigmas, capsize=3, ecolor="gray")
     plt.savefig(f"{name}.svg")
+    plt.cla()
 
 run("tree")
 run("system")
