@@ -5,7 +5,7 @@ import os
 import re
 
 def run(name):
-    out = subprocess.run(["./run", "-m", name], capture_output=True, env=os.environ.copy().update({"EXEC": "bench"}))
+    out = subprocess.run(["./run", "--omp", "-m", name], capture_output=True, env=os.environ.copy().update({"EXEC": "bench"}))
 
     i = []
     avgs = []

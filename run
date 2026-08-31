@@ -17,6 +17,7 @@ if [[ $1 == "--omp" ]]; then
     export OMP_NUM_THREADS=$(nproc)
     export OMP_PROC_BIND=true
     export OMP_PLACES=cores
+    dir=build
 fi
 
 if [[ $1 == "--cuda" ]]; then
@@ -49,3 +50,4 @@ cmake -B $dir $options $build \
     -DKokkosKernels_ENABLE_COMPONENT_ODE=OFF || exit
 cmake --build $dir --parallel || exit
 time $dir/src/$EXEC $@ || exit
+
