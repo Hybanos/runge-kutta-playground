@@ -25,6 +25,7 @@ def run(name):
 
     plt.grid()
     plt.yscale("log")
+    plt.xticks(i)
     plt.xlabel("stages")
     plt.ylabel("time (s)")
     plt.title(f"{name} generation time")
