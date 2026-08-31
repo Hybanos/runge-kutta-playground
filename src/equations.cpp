@@ -15,7 +15,10 @@ host_equations build_equations(pool &p, uint8_t stages) {
 
     // cache all k-permutation we're gonna need (x25 banger speedup)
     std::vector<k_permutations<uint8_t>> perm_iterators;
-    for (int i = 0; i < stages; i++) {perm_iterators.push_back(k_permutations(i, label_values));std::cout << "alloc done " << i << std::endl;}
+    for (int i = 0; i < stages; i++) {
+        perm_iterators.push_back(k_permutations(i, label_values));
+        // std::cout << "alloc done " << i << std::endl;
+    }
 
     uint64_t total_products = 0;
     uint64_t tree_i = 0;

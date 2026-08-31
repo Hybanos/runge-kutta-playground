@@ -19,8 +19,10 @@ struct config_t {
     uint64_t max_iter = -1;
     uint64_t checkpoint_save_freq = 100;
     uint64_t print_freq = 1;
-    uint64_t solution_count = 0;
+    uint64_t solution_count = -1;
     uint64_t ttl = -1;
+    long seed = 0;
+
     double accept_tol = 1e-12;
 
     bool dump_equations = false;
@@ -49,6 +51,7 @@ int main(int argc, char **argv) {
         app.add_option("--solution-count", c.solution_count, "Number of solutions to find before exiting the program");
         app.add_option("--ttl", c.ttl, "Maximum number of lived iterations before being reset");
         app.add_option("--accept-tol", c.accept_tol, "Residual norm under which the method is accepted");
+        app.add_option("--seed", c.seed, "Seed for initial values, 0 for random");
 
         app.add_flag("--dump-equations", c.dump_equations, "Print equations and Jacobian");
         app.add_flag("--dump-state", c.dump_state, "Print values used while computing");
@@ -117,7 +120,7 @@ int main(int argc, char **argv) {
         Kokkos::View<double   *> speeds("speeds", c.N);
 
         if (c.wipe_checkpoint) wipe_checkpoint(c.stages);
-        if (!load_checkpoint(c.stages, x, norms, speeds)) init_x(x);
+        if (!load_checkpoint(c.stages, x, norms, speeds)) init_x(x, c.seed);
         Kokkos::fence();
         c.N = norms.extent(0);
 
@@ -179,9 +182,9 @@ int main(int argc, char **argv) {
 
             // backtrack
             Kokkos::deep_copy(accept, 1.0);
-            backtrack(c.N, c.stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas, accept);
+            // backtrack(c.N, c.stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas, accept);
             Kokkos::fence();
-            // Kokkos::deep_copy(alphas, 1);
+            Kokkos::deep_copy(alphas, 1);
 
             // update x
             update_weights(x, dx, alphas, accept);

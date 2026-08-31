@@ -6,7 +6,7 @@
 // #include <Kokkos_Core.hpp>
 // #include <KokkosBlas3_gemm.hpp>
 // #include <KokkosLapack_gesv.hpp>
-// #include <CLI/CLI.hpp>
+#include <CLI/CLI.hpp>
 // #include <thread>
 
 #include "tree.hpp"
@@ -47,8 +47,7 @@ double std_dev(std::vector<double> &v) {
     return std::sqrt(variance);
 }
 
-int main(int argc, char **argv) {
-
+void bench_trees() {
     for (int i = 2; i < 20; i++) {
 
         int64_t reps = i < 16 ? 1 << (16 - i) : 1;
@@ -81,6 +80,61 @@ int main(int argc, char **argv) {
                   << std_dev(values) << " sigmas. (" 
                   << reps << " reps)" << std::endl;
     }
+}
+
+void bench_systems() {
+    int max = 13;
+
+    for (int i = 2; i < max; i++) {
+
+        int64_t reps = 1 << (max - i - 1);
+
+        std::vector<double> values(reps);
+
+        pool p;
+        p.gen(i);
+
+        for (uint64_t j = 0; j < reps; j++) {
+
+            auto t1 = std::chrono::high_resolution_clock::now();
+
+            auto eq = build_equations(p, i);
+            auto ja = build_jacobian(p, i, eq);
+
+            auto t2 = std::chrono::high_resolution_clock::now();
+
+            values[j] = (t2 - t1).count() / 1e9;
+        }
+
+        std::cout << i << " : " 
+                  << avg(values) << "s average, " 
+                  << mean(values) << "s mean, " 
+                  << std_dev(values) << " sigmas. (" 
+                  << reps << " reps)" << std::endl;
+    }
+}
+
+int main(int argc, char **argv) {
+
+    Kokkos::initialize(argc, argv);
+    {
+        CLI::App app("bench");
+        argv = app.ensure_utf8(argv);
+
+        std::string sel = "";
+
+        app.add_flag("--omp");
+        app.add_flag("--hip");
+        app.add_flag("--cuda");
+
+        app.add_option("-m", sel, "Bench mode");
+
+        CLI11_PARSE(app, argc, argv);
+
+        if (sel == "tree") bench_trees();
+        if (sel == "system") bench_systems();
+    }
+    Kokkos::finalize();
 
     return 0;
 }

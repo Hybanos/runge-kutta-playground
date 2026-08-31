@@ -2,6 +2,10 @@
 
 dir="build"
 
+if [[ -z "$EXEC" ]]; then
+    EXEC="main"
+fi
+
 build=""
 if [ -f /usr/bin/ninja ]; then
     build="-G Ninja"
@@ -44,4 +48,4 @@ cmake -B $dir $options $build \
     -DKokkosKernels_ENABLE_COMPONENT_SPARSE=OFF \
     -DKokkosKernels_ENABLE_COMPONENT_ODE=OFF || exit
 cmake --build $dir --parallel || exit
-time $dir/src/main $@ || exit
+time $dir/src/$EXEC $@ || exit

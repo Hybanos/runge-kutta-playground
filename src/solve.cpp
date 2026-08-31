@@ -5,9 +5,10 @@ typedef Kokkos::TeamPolicy<>::member_type member_type;
 #define RANDOM_LB -2.0
 #define RANDOM_UB  2.0
 
-void init_x(Kokkos::View<double **> &x) {
+void init_x(Kokkos::View<double **> &x, long seed) {
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
-    Kokkos::Random_XorShift64_Pool<> random_pool(time(NULL));
+    if (seed == 0) seed = time(NULL);
+    Kokkos::Random_XorShift64_Pool<> random_pool(seed);
     // Kokkos::Random_XorShift64_Pool<> random_pool(52);
 
     Kokkos::parallel_for(

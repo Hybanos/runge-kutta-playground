@@ -7,4 +7,5 @@ sudo docker run -it --rm \
     --group-add=video \
     --group-add=render \
     -v .:/src \
-    rocm-cmake $1 $2 $3
+    -e EXEC=$EXEC \
+    rocm-cmake $@

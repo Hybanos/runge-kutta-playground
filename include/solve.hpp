@@ -10,7 +10,7 @@
 
 #include "equations.hpp"
 
-void init_x(Kokkos::View<double **> &x);
+void init_x(Kokkos::View<double **> &x, long seed);
 
 void evaluate_equations(
     uint32_t N, uint8_t stages, 
@@ -56,7 +56,8 @@ void simple_copy_and_print_1d(Kokkos::View<T *> &v) {
 
     std::cout << "matrix: " << v.label() << std::endl;
     for (int i = 0; i < v.extent(0); i++) {
-        std::cout << fmt::format("{:<6.4g}", tmp(i)) << "\t";
+        std::cout << fmt::format("{:<9.9g}", tmp(i)) << "\t";
+        // std::cout << fmt::format("{:6.4g}", tmp(i)) << "\t";
     }
     std::cout << std::endl;
 }
