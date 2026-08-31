@@ -4,6 +4,12 @@ import numpy as np
 import os
 import re
 
+i = []
+avgs = []
+means = []
+sigmas = []
+reps = []
+
 def run(name):
     out = subprocess.run(["./run", "--omp", "-m", name], capture_output=True, env=os.environ.copy().update({"EXEC": "bench"}))
 
@@ -23,15 +29,15 @@ def run(name):
             sigmas.append(float(result.group(4)))
             reps.append(int(result.group(5)))
 
-    plt.grid()
-    plt.yscale("log")
+    plt.errorbar(i, means, yerr=sigmas, capsize=3, ecolor="gray", label=name)
     plt.xticks(i)
-    plt.xlabel("stages")
-    plt.ylabel("time (s)")
-    plt.title(f"{name} generation time")
-    plt.errorbar(i, means, yerr=sigmas, capsize=3, ecolor="gray")
-    plt.savefig(f"{name}.svg")
-    plt.cla()
 
-run("tree")
 run("system")
+run("tree")
+
+plt.grid()
+plt.yscale("log")
+plt.xlabel("stages")
+plt.ylabel("time (s)")
+plt.title(f"Trees and Systems generation time")
+plt.savefig(f"out.svg")
