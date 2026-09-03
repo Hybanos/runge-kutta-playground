@@ -14,7 +14,7 @@ fi
 if [[ $1 == "--omp" ]]; then
     options="-DKokkos_ENABLE_OPENMP=ON"
     # export OMP_NUM_THREADS=$(lscpu -p | egrep -v '^#' | sort -u -t, -k 2,4 | wc -l)
-    export OMP_NUM_THREADS=$(nproc)
+    # export OMP_NUM_THREADS=$(nproc)
     export OMP_PROC_BIND=true
     export OMP_PLACES=cores
     dir=build

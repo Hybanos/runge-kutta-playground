@@ -6,3 +6,5 @@ cache/
 *.nsys*
 *.sqlite
 *.txt
+*.svg
+*.bin

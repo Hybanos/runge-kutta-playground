@@ -30,6 +30,7 @@ struct config_t {
 
     bool dump_equations = false;
     bool dump_state = false;
+    bool dump_mem = false;
 
     bool wipe_checkpoint = false;
 };
@@ -61,6 +62,7 @@ int main(int argc, char **argv) {
 
         app.add_flag("--dump-equations", c.dump_equations, "Print equations and Jacobian");
         app.add_flag("--dump-state", c.dump_state, "Print values used while computing");
+        app.add_flag("--dump-mem,--dump-memory", c.dump_mem, "Prints memory usage");
         app.add_flag("--wipe", c.wipe_checkpoint, "Clears previously saved checkpoints");
 
         app.set_help_flag("-h,--help", "?");
@@ -133,7 +135,7 @@ int main(int argc, char **argv) {
         Kokkos::View<double  **> equations_reduce("eq_reduce", equations_h.total, c.N);
         Kokkos::View<double  **> jacobian_reduce("jc_reduce", jacobian_h.total, c.N);
 
-        Kokkos::View<int     **> ipiv("ipiv", total_params, c.N);
+        // Kokkos::View<int     **> ipiv("ipiv", total_params, c.N);
         Kokkos::View<double  **> f("f", equations_h.sizes.size(), c.N);
         Kokkos::View<double  **> f_back("f_back", equations_h.sizes.size(), c.N);
         Kokkos::View<double ***> J("J", total_params, equations_h.sizes.size(), c.N);
@@ -146,6 +148,37 @@ int main(int argc, char **argv) {
         Kokkos::View<double   *> lambdas("lambdas", c.N);
         Kokkos::View<uint8_t  *> accept("accept", c.N);
         Kokkos::View<uint64_t *> ttl("ttl", c.N);
+
+        if (c.dump_mem) {
+            std::cout << 
+                equations_d.params.label() << " " << equations_d.params.size() * 1 << "\n" <<
+                equations_d.sizes.label() << " " << equations_d.sizes.size() * 4 << "\n" <<
+                equations_d.indexes.label() << " " << equations_d.indexes.size() * 4 << "\n" <<
+                equations_d.facts.label() << " " << equations_d.facts.size() * 8<< "\n" <<
+                jacobian_d.params.label() << " " << jacobian_d.params.size() * 1<< "\n" <<
+                jacobian_d.sizes.label() << " " << jacobian_d.sizes.size() * 4 << "\n" <<
+                jacobian_d.indexes.label() << " " << jacobian_d.indexes.size() * 4 << "\n" <<
+                
+                x.label() << " " << x.size() * 8 << "\n" <<
+                norms.label() << " " << norms.size()  * 8 << "\n" <<
+                speeds.label() << " " << speeds.size()  * 8 << "\n" <<
+
+                equations_reduce.label() << " " << equations_reduce.size()  * 8 << "\n" <<
+                jacobian_reduce.label() << " " << jacobian_reduce.size()  * 8 << "\n" <<
+
+                f.label() << " " << f.size()  * 8 << "\n" <<
+                f_back.label() << " " << f_back.size()  * 8 << "\n" <<
+                J.label() << " " << J.size()  * 8 << "\n" <<
+                A.label() << " " << A.size()  * 8 << "\n" <<
+                b.label() << " " << b.size()  * 8 << "\n" <<
+                dx.label() << " " << dx.size()  * 8 << "\n" <<
+                x_tmp.label() << " " << x_tmp.size()  * 8 << "\n" <<
+                norms_last.label() << " " << norms_last.size()  * 8 << "\n" <<
+                alphas.label() << " " << alphas.size()  * 8 << "\n" <<
+                lambdas.label() << " " << lambdas.size()  * 8 << "\n" <<
+                accept.label() << " " << accept.size()  * 1 << "\n" <<
+                ttl.label() << " " << ttl.size()  * 8 << std::endl;
+        }
 
         Kokkos::deep_copy(ttl, 0);
         Kokkos::deep_copy(alphas, 1e-10);
@@ -215,7 +248,10 @@ int main(int argc, char **argv) {
                 simple_copy_and_print_1d(alphas);
 
                 auto t2 = std::chrono::high_resolution_clock::now();
-                std::cout << i << " " << "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * c.N) << std::endl;
+                std::cout << i << " " << 
+                          "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * c.N) << 
+                          ", " << (t2 - t1).count() / 1e9 << "s" << 
+                          std::endl;
             }
             Kokkos::fence();
             if (!(i%c.checkpoint_save_freq)) save_checkpoint(c.N, c.stages, x, norms, speeds);

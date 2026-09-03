@@ -4,41 +4,111 @@ import numpy as np
 import os
 import re
 
-i = []
-avgs = []
-means = []
-sigmas = []
-reps = []
-
-def run(name):
-    out = subprocess.run(["./run", "--omp", "-m", name], capture_output=True, env=os.environ.copy().update({"EXEC": "bench"}))
-
+def bech_exec():
     i = []
     avgs = []
     means = []
     sigmas = []
     reps = []
 
-    for line in out.stdout.decode().split("\n"):
-        pattern = r"(\d+) : ([\d\.e-]+)s average, ([\d\.e-]+)s mean, ([\d\.e-]+) sigmas. \((\d+) reps\)"
-        result = re.match(pattern, line)
-        if (result):
-            i.append(int(result.group(1)))
-            avgs.append(float(result.group(2)))
-            means.append(float(result.group(3)))
-            sigmas.append(float(result.group(4)))
-            reps.append(int(result.group(5)))
+    def run(name):
+        out = subprocess.run(["./run", "--omp", "-m", name], capture_output=True, env=os.environ.copy().update({"EXEC": "bench"}))
 
-    plt.errorbar(i, means, yerr=sigmas, capsize=3, ecolor="gray", label=name)
-    plt.xticks(i)
+        i = []
+        avgs = []
+        means = []
+        sigmas = []
+        reps = []
 
-run("system")
-run("tree")
+        for line in out.stdout.decode().split("\n"):
+            pattern = r"(\d+) : ([\d\.e-]+)s average, ([\d\.e-]+)s mean, ([\d\.e-]+) sigmas. \((\d+) reps\)"
+            result = re.match(pattern, line)
+            if (result):
+                i.append(int(result.group(1)))
+                avgs.append(float(result.group(2)))
+                means.append(float(result.group(3)))
+                sigmas.append(float(result.group(4)))
+                reps.append(int(result.group(5)))
 
-plt.grid()
-plt.yscale("log")
-plt.xlabel("stages")
-plt.ylabel("time (s)")
-plt.title(f"Trees and Systems generation time")
-plt.legend()
-plt.savefig(f"out.svg")
+        plt.errorbar(i, means, yerr=sigmas, capsize=3, ecolor="gray", label=name)
+        plt.xticks(i)
+
+
+
+    run("system")
+    run("tree")
+
+    plt.grid()
+    plt.yscale("log")
+    plt.xlabel("stages")
+    plt.ylabel("time (s)")
+    plt.title(f"Trees and Systems generation time")
+    plt.legend()
+    plt.savefig(f"out.svg")
+
+def bench_perf():
+    cores = [4, 8, 16, 32, 64, 128, 256]
+    iters = 10
+
+    data = np.zeros((len(cores), iters))
+
+    for c in cores:
+        env = os.environ.copy()
+        env.update({
+            "OMP_NUM_THREADS": str(c)
+        })
+        cmd = [
+            "./run",
+            "--omp",
+            "-s10",
+            "-n1000",
+            f"-i{iters}",
+            "--wipe",
+            "--checkpoint-save-freq", "10000",
+            "--seed", "100"
+        ]
+        out = subprocess.run(cmd, capture_output=True, env=env)
+        print(out.stderr.decode())
+        i = 0
+        for line in out.stdout.decode().split("\n"):
+            pattern = r"\d+ ips: (\d+) ([\d\.]+)s"
+            match = re.match(pattern, line)
+            if match is not None:
+                data[cores, i] = match.group(2)
+                i += 1
+        print(c, data)
+
+    data.tofile("perf_out.bin")
+
+def plot_mem():
+    n_range = list(range(50, 1000, 50))
+    s_range = list(range(2, 11))
+    data = np.zeros((len(n_range), len(s_range)))
+    for i_n, n in enumerate(n_range):
+        for i_s, s in enumerate(s_range):
+            cmd = [
+                "./run",
+                "--omp",
+                f"-s{s}",
+                f"-n{n}",
+                "-i0",
+                "--dump-mem",
+                "--wipe",
+            ]
+            out = subprocess.run(cmd, capture_output=True)
+            print(out.stdout.decode())
+            print(out.stderr.decode())
+            total_size = 0
+            for line in out.stdout.decode().split("\n"):
+                pattern = r"^.+ (\d+)$"
+                match = re.match(pattern, line)
+                if match is not None:
+                    total_size += int(match.group(1))
+                
+            data[i_n, i_s] = total_size
+
+    data.tofile("ram_cost.bin")
+
+if __name__ == "__main__":
+    plot_mem()
+    # print(np.fromfile("ram_cost.bin"))
