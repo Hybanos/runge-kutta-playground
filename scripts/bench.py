@@ -48,11 +48,11 @@ def bech_exec():
 
 def bench_perf():
     cores = [4, 8, 16, 32, 64, 128, 256]
-    iters = 10
+    iters = 33
 
     if not os.path.exists("perf_out.bin"):
         data = np.zeros((len(cores), iters))
-        for c in cores:
+        for i_c, c in enumerate(cores):
             env = os.environ.copy()
             env.update({
                 "OMP_NUM_THREADS": str(c)
@@ -71,10 +71,10 @@ def bench_perf():
             print(out.stderr.decode())
             i = 0
             for line in out.stdout.decode().split("\n"):
-                pattern = r"\d+ ips: (\d+), ([\d\.]+)s"
+                pattern = r".*\d+ ips: (\d+), ([\d\.]+)s.*"
                 match = re.match(pattern, line)
                 if match is not None:
-                    data[cores, i] = match.group(2)
+                    data[i_c, i] = match.group(2)
                     i += 1
             print(c, data)
 
