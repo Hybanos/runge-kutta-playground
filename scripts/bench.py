@@ -33,8 +33,6 @@ def bech_exec():
         plt.errorbar(i, means, yerr=sigmas, capsize=3, ecolor="gray", label=name)
         plt.xticks(i)
 
-
-
     run("system")
     run("tree")
 
@@ -80,8 +78,18 @@ def bench_perf():
 
         data.tofile("perf_out.bin")
 
-    data = np.fromfile("perf_out.bin")
-    print(data)
+    data = 1 / np.fromfile("perf_out.bin").reshape((len(cores), iters)) * 1000
+    means = data.mean(1)
+    dev = data.std(1)
+    print(means, dev)
+    plt.errorbar(cores, means, dev, capsize=3, ecolor="gray")
+    plt.xscale("log", base=2)
+    plt.ylim(0)
+    plt.grid()
+    plt.xlabel("CPU Cores")
+    plt.ylabel("Newton method iterations per second")
+    plt.title("$s=10$ system scaling \n OpenMP, ROMEO")
+    plt.show()
 
 def plot_mem():
     def format_size(mb):
