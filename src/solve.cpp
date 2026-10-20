@@ -24,7 +24,7 @@ void init_x(Kokkos::View<double **> &x, long seed) {
 }
 
 void evaluate_equations(    
-    uint32_t N, uint8_t stages, 
+    uint32_t N, uint8_t order, uint8_t stages, 
     device_equations &equations_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
@@ -37,7 +37,7 @@ void evaluate_equations(
         Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {equations_d.total, (uint64_t) N}),
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             double prod = 1.0;
-            for (int j = 0; j < stages; j++) {
+            for (int j = 0; j < order; j++) {
                 uint8_t index = equations_d.params(i, j);
                 // multiply by one 1 if we're out of the param range
                 if (index != total_params) prod *= x(index, n);
@@ -72,7 +72,7 @@ void evaluate_equations(
 }
 
 void evaluate_jacobian(
-    uint32_t N, uint8_t stages, 
+    uint32_t N, uint8_t order, uint8_t stages, 
     device_jacobian &jacobian_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
@@ -88,7 +88,7 @@ void evaluate_jacobian(
         policy, 
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             double prod = 1.0;
-            for (int j = 0; j < stages; j++) {
+            for (int j = 0; j < order; j++) {
                 uint8_t index = jacobian_d.params(i, j);
                 // if we're out of the param range, we need to multiply bu an integer corresponding 
                 // with a total_params offset
@@ -332,7 +332,7 @@ void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &
 }
 
 void backtrack(
-    uint64_t N, uint8_t stages, 
+    uint64_t N, uint8_t order, uint8_t stages, 
     device_equations &equations_d, 
     Kokkos::View<double **> &x,
     Kokkos::View<double **> &red,
@@ -363,7 +363,7 @@ void backtrack(
         );
         Kokkos::fence();
 
-        evaluate_equations(N, stages, equations_d, x_tmp, red, f_tmp);
+        evaluate_equations(N, order, stages, equations_d, x_tmp, red, f_tmp);
         Kokkos::fence();
 
         Kokkos::parallel_for(

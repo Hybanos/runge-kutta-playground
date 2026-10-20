@@ -1,6 +1,6 @@
 #include "equations.hpp"
 
-host_equations build_equations(pool &p, uint8_t stages) {
+host_equations build_equations(pool &p, uint8_t order, uint8_t stages) {
 
     uint8_t one_index = stages + stages - 1 + (stages - 1) * (stages - 2) / 2;
     uint64_t equation_count = p.count_trees();
@@ -13,16 +13,10 @@ host_equations build_equations(pool &p, uint8_t stages) {
     std::vector<uint8_t> label_values(stages); 
     for (int i = 0; i < stages; i++) label_values[i] = i;
 
-    // cache all k-permutation we're gonna need (x25 banger speedup)
-    std::vector<k_permutations<uint8_t>> perm_iterators;
-    for (int i = 0; i < stages; i++) {
-        perm_iterators.push_back(k_permutations(i, label_values));
-        // std::cout << "alloc done " << i << std::endl;
-    }
-
     uint64_t total_products = 0;
     uint64_t tree_i = 0;
     for (auto it = tree_iterator(p); !it.done(); ++it) {
+        std::cout << tree_i << "/" << p.count_trees() << "\r";
         p.label_tree(*it);
         phi _phi(p, *it);
         // _phi.print();
@@ -30,30 +24,31 @@ host_equations build_equations(pool &p, uint8_t stages) {
         int label_count = 0;
         for (uint64_t i = *it; i < *it + p.order(*it); i++) if (p[i].label) label_count++;
         uint64_t local_products = 0;
-        k_permutations<uint8_t> &perm = perm_iterators[label_count];
-        for (; !perm.done(); ++perm) {
+        k_tuples<uint8_t> k_t(label_count, stages);
+
+        for (; !k_t.done(); ++k_t) {
             bool is_zero = false;
             // for (auto &f : _phi.factors) {
-            for (int i = 0; i < stages; i++) {
+            for (int i = 0; i < order; i++) {
                 if (i < _phi.factors.size()) {
                     factor f = _phi.factors[i];
 
                     if (f.type == 'a' && 
-                        (*perm)[f.label_2 - 'i'] >
-                        (*perm)[f.label_1 - 'i']) {
+                        (*k_t)[f.label_2 - 'i'] >=
+                        (*k_t)[f.label_1 - 'i']) {
                         is_zero = true;
                     }
 
                     if (f.type == 'c' && 
-                        (*perm)[f.label_1 - 'i'] == 0) {
+                        (*k_t)[f.label_1 - 'i'] == 0) {
                         is_zero = true;
                     }
 
                     factor f_perm;
                     if (f.type == 'b' || f.type == 'c') {
-                        f_perm = factor{f.type, (char) (*perm)[f.label_1 - 'i'], 0};
+                        f_perm = factor{f.type, (char) (*k_t)[f.label_1 - 'i'], 0};
                     } else {
-                        f_perm = factor{f.type, (char) (*perm)[f.label_1 - 'i'], (char) (*perm)[f.label_2 - 'i']};
+                        f_perm = factor{f.type, (char) (*k_t)[f.label_1 - 'i'], (char) (*k_t)[f.label_2 - 'i']};
                     }
 
                     uint8_t ind = get_index(f_perm, stages);
@@ -66,7 +61,7 @@ host_equations build_equations(pool &p, uint8_t stages) {
                 }
             }
             if (!is_zero) local_products++;
-            else _factors.resize(_factors.size() - stages);
+            else _factors.resize(_factors.size() - order);
         }
         _equation_sizes[tree_i] = local_products;
         _equation_indexes[tree_i] = total_products;
@@ -91,7 +86,7 @@ host_equations build_equations(pool &p, uint8_t stages) {
     // }
 
     host_equations equations {
-        .params = decltype(host_equations::params)("", _factors.size() / stages, stages),
+        .params = decltype(host_equations::params)("", _factors.size() / order, order),
         .sizes = decltype(host_equations::sizes)("", _equation_sizes.size()),
         .indexes = decltype(host_equations::indexes)("", _equation_indexes.size()),
         .facts = decltype(host_equations::facts)("", _factorials.size()),
@@ -112,7 +107,7 @@ host_equations build_equations(pool &p, uint8_t stages) {
     return equations;
 }
 
-host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations) {
+host_jacobian build_jacobian(pool &p, uint8_t order, uint8_t stages, host_equations &equations) {
 
     uint8_t param_count = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
     uint8_t one_index = param_count;
@@ -139,7 +134,7 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
                 // (offset from the total param_count)
                 uint8_t count = 0;
                 uint64_t last_pos = 0;
-                for (int l = 0; l < stages; l++) {
+                for (int l = 0; l < order; l++) {
                     uint8_t prod = equations.params(index + k, l);
                     if (prod == j) {
                         count += 1;
@@ -151,7 +146,7 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
                 
                 // if we didn't derivate yet, set product to 0
                 if (!factor_found) {
-                    _factors.resize(_factors.size() - stages);
+                    _factors.resize(_factors.size() - order);
                 } else {
                     local_products++;
                     // replace last occurrence
@@ -182,7 +177,7 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
     // std::cout << std::endl;
 
     host_jacobian jacobian {
-        decltype(host_jacobian::params)("", _factors.size() / stages, stages),
+        decltype(host_jacobian::params)("", _factors.size() / order, order),
         decltype(host_jacobian::sizes)("", _equation_sizes.size()),
         decltype(host_jacobian::indexes)("", _equation_indexes.size()),
         _equation_indexes[equation_count-1] + _equation_sizes[equation_count-1] 
@@ -195,7 +190,7 @@ host_jacobian build_jacobian(pool &p, uint8_t stages, host_equations &equations)
     return jacobian;
 }
 
-host_equations build_equations_or_get_cached(pool &p, uint8_t stages) {
+host_equations build_equations_or_get_cached(pool &p, uint8_t order, uint8_t stages) {
     if (!std::filesystem::exists("./cache/equations")) std::filesystem::create_directories("./cache/equations");
 
     host_equations equations;
@@ -206,15 +201,15 @@ host_equations build_equations_or_get_cached(pool &p, uint8_t stages) {
         !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_facts")   ||
         !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_total")
     ) {
-        equations = build_equations(p, stages);
-        save_equations(stages, equations);
+        equations = build_equations(p, order, stages);
+        save_equations(stages, order, equations);
     } else {
-        equations = load_equations(stages);
+        equations = load_equations(order, stages);
     }
     return equations;
 }
 
-host_jacobian build_jacobian_or_get_cached(pool &p, uint8_t stages, host_equations &equations) {
+host_jacobian build_jacobian_or_get_cached(pool &p, uint8_t order, uint8_t stages, host_equations &equations) {
     if (!std::filesystem::exists("./cache/jacobian")) std::filesystem::create_directories("./cache/jacobian");
 
     host_jacobian jacobian;
@@ -224,15 +219,15 @@ host_jacobian build_jacobian_or_get_cached(pool &p, uint8_t stages, host_equatio
         !std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes") ||
         !std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_total")
     ) {
-        jacobian = build_jacobian(p, stages, equations);
-        save_jacobian(stages, jacobian);
+        jacobian = build_jacobian(p, order, stages, equations);
+        save_jacobian(order, stages, jacobian);
     } else {
-        jacobian = load_jacobian(stages);
+        jacobian = load_jacobian(order, stages);
     }
     return jacobian;
 }
 
-void save_equations(uint8_t stages, host_equations &equations) {
+void save_equations(uint8_t order, uint8_t stages, host_equations &equations) {
     save_view("./cache/equations/s" + std::to_string((int) stages) + "_eq_params", equations.params);
     save_view("./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes", equations.sizes);
     save_view("./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes", equations.indexes);
@@ -240,14 +235,14 @@ void save_equations(uint8_t stages, host_equations &equations) {
     save_scalar("./cache/equations/s" + std::to_string((int) stages) + "_eq_total", equations.total);
 }
 
-void save_jacobian(uint8_t stages, host_jacobian &jacobian) {
+void save_jacobian(uint8_t order, uint8_t stages, host_jacobian &jacobian) {
     save_view("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params", jacobian.params);
     save_view("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes", jacobian.sizes);
     save_view("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes", jacobian.indexes);
     save_scalar("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_total", jacobian.total);
 }
 
-host_equations load_equations(uint8_t stages) {
+host_equations load_equations(uint8_t order, uint8_t stages) {
     std::string p1 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_params";
     std::string p2 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes";
     std::string p3 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes";
@@ -255,7 +250,7 @@ host_equations load_equations(uint8_t stages) {
     std::string p5 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_total";
 
     return host_equations{
-        .params = load_view<decltype(host_equations::params)>(p1, std::filesystem::file_size(p1) / sizeof(uint8_t) / stages, stages),
+        .params = load_view<decltype(host_equations::params)>(p1, std::filesystem::file_size(p1) / sizeof(uint8_t) / order, order),
         .sizes = load_view<decltype(host_equations::sizes)>(p2, std::filesystem::file_size(p2) / sizeof(uint32_t)),
         .indexes = load_view<decltype(host_equations::indexes)>(p3, std::filesystem::file_size(p3) / sizeof(uint32_t)),
         .facts = load_view<decltype(host_equations::facts)>(p4, std::filesystem::file_size(p4) / sizeof(double)),
@@ -263,32 +258,32 @@ host_equations load_equations(uint8_t stages) {
     };
 }
 
-host_jacobian load_jacobian(uint8_t stages) {
+host_jacobian load_jacobian(uint8_t order, uint8_t stages) {
     std::string p1 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params";
     std::string p2 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes";
     std::string p3 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes";
     std::string p4 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_total";
 
     return host_jacobian{
-        .params = load_view<decltype(host_jacobian::params)>(p1, std::filesystem::file_size(p1) / sizeof(uint8_t) / stages, stages),
+        .params = load_view<decltype(host_jacobian::params)>(p1, std::filesystem::file_size(p1) / sizeof(uint8_t) / order, order),
         .sizes = load_view<decltype(host_jacobian::sizes)>(p2, std::filesystem::file_size(p2) / sizeof(uint32_t)),
         .indexes = load_view<decltype(host_jacobian::indexes)>(p3, std::filesystem::file_size(p3) / sizeof(uint32_t)),
         .total = load_scalar<uint64_t>(p4)
     };
 }
 
-void print_equations(uint8_t stages, host_equations &equations) {
+void print_equations(uint8_t order, uint8_t stages, host_equations &equations) {
     std::cout << "=== Equations ===" << std::endl;
     for (int i = 0; i < equations.sizes.size(); i++) {
         uint32_t size = equations.sizes[i];
         uint32_t index = equations.indexes[i];
 
         for (int k = 0; k < size; k += 1) {
-            for (int l = 0; l < stages; l++) {
+            for (int l = 0; l < order; l++) {
                 uint8_t prod = equations.params(index + k, l);
 
                 std::cout << get_factor(prod, stages);
-                if (l < stages - 1) std::cout << "*";
+                if (l < order - 1) std::cout << "*";
             }
             if (k < size - 1) std::cout << " + ";
             else std::cout << " - " << equations.facts[i];
@@ -297,7 +292,7 @@ void print_equations(uint8_t stages, host_equations &equations) {
     }    
 }
 
-void print_jacobian(uint8_t stages, host_jacobian &jacobian) {
+void print_jacobian(uint8_t order, uint8_t stages, host_jacobian &jacobian) {
     uint8_t param_count = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
     int derivation_param = -1;
 
@@ -312,12 +307,12 @@ void print_jacobian(uint8_t stages, host_jacobian &jacobian) {
         }
 
         for (int k = 0; k < size; k += 1) {
-            for (int l = 0; l < stages; l++) {
+            for (int l = 0; l < order; l++) {
                 uint8_t prod = jacobian.params(index + k, l);
 
                 // std::cout << get_factor(prod, stages);
                 std::cout << get_factor(prod, stages);
-                if (l < stages - 1) std::cout << "*";
+                if (l < order - 1) std::cout << "*";
             }
             if (k < size - 1) std::cout << " + ";
         }

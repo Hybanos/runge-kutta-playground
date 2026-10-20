@@ -16,6 +16,7 @@
 struct config_t {
     uint64_t N = 0;
     uint8_t stages = 3;
+    uint8_t order = 3;
     uint64_t max_iter = -1;
     uint64_t checkpoint_save_freq = 100;
     uint64_t print_freq = 1;
@@ -51,6 +52,7 @@ int main(int argc, char **argv) {
         app.add_flag_callback("--no-levenberg", [&](){c.use_levenberg = false;});
 
         app.add_option("-N,-n", c.N, "Number of tableaux to compute in parallel");
+        app.add_option("-p,--order", c.order, "Order of the method");
         app.add_option("-s,--stages", c.stages, "Stages of the method");
         app.add_option("-i,--max_iter", c.max_iter, "Maximum number of iterations");
         app.add_option("--checkpoint-save-freq", c.checkpoint_save_freq, "Number of iterations between checkpoint json save");
@@ -71,19 +73,19 @@ int main(int argc, char **argv) {
 
         // generate trees
         pool p;
-        p.gen(c.stages);
+        p.gen(c.order);
 
         uint8_t total_params = (c.stages - 1) * (c.stages - 2) / 2 + c.stages + c.stages - 1;
         auto device_space = Kokkos::DefaultExecutionSpace();
         auto host_space = Kokkos::DefaultHostExecutionSpace();
 
         // build equation array and jacobian matrix 
-        host_equations equations_h = build_equations_or_get_cached(p, c.stages);
-        host_jacobian jacobian_h = build_jacobian_or_get_cached(p, c.stages, equations_h);
+        host_equations equations_h = build_equations_or_get_cached(p, c.order, c.stages);
+        host_jacobian jacobian_h = build_jacobian_or_get_cached(p, c.order, c.stages, equations_h);
 
         if (c.dump_equations) {
-            print_equations(c.stages, equations_h);
-            print_jacobian(c.stages, jacobian_h);
+            print_equations(c.order, c.stages, equations_h);
+            print_jacobian(c.order, c.stages, jacobian_h);
 
             std::cout << "= Equations (index, size) =" << std::endl;
             for (int i = 0; i < equations_h.sizes.size(); i++) {
@@ -186,8 +188,8 @@ int main(int argc, char **argv) {
 
         for (int i = 0; i < c.max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
-            evaluate_equations(c.N, c.stages, equations_d, x, equations_reduce, f);
-            evaluate_jacobian(c.N, c.stages, jacobian_d, x, jacobian_reduce, J);
+            evaluate_equations(c.N, c.order, c.stages, equations_d, x, equations_reduce, f);
+            evaluate_jacobian(c.N, c.order, c.stages, jacobian_d, x, jacobian_reduce, J);
             Kokkos::fence();
 
             // compute A = J.T @ J
@@ -222,7 +224,7 @@ int main(int argc, char **argv) {
             // backtrack
             Kokkos::deep_copy(accept, 1.0);
             if (c.use_backtrack) {
-                backtrack(c.N, c.stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas, accept);
+                backtrack(c.N, c.order, c.stages, equations_d, x, equations_reduce, f, f_back, dx, x_tmp, alphas, accept);
             } else {
                 Kokkos::deep_copy(alphas, 1);
             }

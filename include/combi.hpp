@@ -97,3 +97,39 @@ class k_permutations {
         void operator++() {iter++;}
         T* operator*() {return &(out[iter * k]);}
 };
+
+template <class T>
+class k_tuples {
+    private:
+        T n;
+        T k;
+        std::vector<T> vals;
+        uint64_t count;
+    public:
+        k_tuples(T _n, T _k) : n{_n}, k{_k} {
+            vals = std::vector<T>(n, 0);
+            count = std::pow(k, n);
+        }
+
+        bool done() {
+            bool r = count == 0;
+            if (r) {
+                for (int j = 0; j < n; j++) vals[j] = 0;
+                count = std::pow(k, n);
+            }
+            return r;
+        }
+
+        void operator++() {
+            count--;
+            vals[0]++;
+            for (int j = 0; j < n-1; j++) {
+                if (vals[j] >= k) {
+                    vals[j] = 0;
+                    vals[j+1]++;
+                } 
+            }
+        }
+
+        std::vector<T>& operator*() {return vals;}
+};

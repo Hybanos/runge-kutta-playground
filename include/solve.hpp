@@ -13,7 +13,7 @@
 void init_x(Kokkos::View<double **> &x, long seed);
 
 void evaluate_equations(
-    uint32_t N, uint8_t stages, 
+    uint32_t N, uint8_t order, uint8_t stages, 
     device_equations &equations_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
@@ -21,7 +21,7 @@ void evaluate_equations(
 );
 
 void evaluate_jacobian(
-    uint32_t N, uint8_t stages, 
+    uint32_t N, uint8_t order, uint8_t stages, 
     device_jacobian &jacobian_d, 
     Kokkos::View<double **> &x, 
     Kokkos::View<double **> &red, 
@@ -37,7 +37,7 @@ void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *
 void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<double *> &norms_last, Kokkos::View<double *> &speeds);
 void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds);
 void backtrack(
-    uint64_t N, uint8_t stages, 
+    uint64_t N, uint8_t order, uint8_t stages, 
     device_equations &equations_d, 
     Kokkos::View<double **> &x,
     Kokkos::View<double **> &red,

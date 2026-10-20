@@ -98,8 +98,8 @@ void bench_systems() {
 
             auto t1 = std::chrono::high_resolution_clock::now();
 
-            auto eq = build_equations(p, i);
-            auto ja = build_jacobian(p, i, eq);
+            auto eq = build_equations(p, i, i);
+            auto ja = build_jacobian(p, i, i, eq);
 
             auto t2 = std::chrono::high_resolution_clock::now();
 
