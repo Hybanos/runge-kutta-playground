@@ -240,7 +240,7 @@ int main(int argc, char **argv) {
 
             if (append_solution(c.N, c.order, c.stages, x, norms, c.accept_tol) >= c.solution_count) break;
             Kokkos::fence();
-            check_and_swap(c.N, f, x, norms, alphas, speeds, ttl, c.ttl, p.count_trees(), c.accept_tol);
+            check_and_swap(c.N, f, x, norms, alphas, lambdas, speeds, ttl, c.ttl, p.count_trees(), c.accept_tol);
             Kokkos::fence();
 
             if (!(i%c.print_freq)) {

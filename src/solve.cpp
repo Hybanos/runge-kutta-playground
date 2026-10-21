@@ -244,7 +244,19 @@ void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kok
     );
 }
 
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &speeds, Kokkos::View<uint64_t *> ttl, uint64_t max_ttl, double upper_tol, double lower_tol) {
+void check_and_swap(
+    uint64_t N, 
+    Kokkos::View<double **> &f, 
+    Kokkos::View<double **> &x, 
+    Kokkos::View<double *> &norms, 
+    Kokkos::View<double *> &alphas, 
+    Kokkos::View<double *> &lambdas, 
+    Kokkos::View<double *> &speeds, 
+    Kokkos::View<uint64_t *> ttl, 
+    uint64_t max_ttl, 
+    double upper_tol, 
+    double lower_tol
+) {
     auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     Kokkos::Random_XorShift64_Pool<> random_pool(t);
 
@@ -263,10 +275,13 @@ void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double 
                         norms(n) > upper_tol ||
                         norms(n) < lower_tol ||
                         alphas(n) <= 1e-12   ||
+                        Kokkos::log(lambdas(n)) > Kokkos::log(norms(n)) + 10 ||
                         ttl(n) > max_ttl     ||
                         Kokkos::isnan(f(i, n))
                     ) {
                         x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
+                        lambdas(n) = 1e-4;
+                        alphas(n) = 1e-10;
                         ttl(n) = 0;
                         // Kokkos::printf("haha %f %f ", norm, tol);
                     }
@@ -315,8 +330,8 @@ void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &
         "lambda rescale",
         Kokkos::RangePolicy(0, N),
         KOKKOS_LAMBDA (uint64_t n) {
-            // lambdas(n) *= speeds(n) < 0 ? 0.1 : 10;
-            lambdas(n) = Kokkos::abs(speeds(n) * 100 + lambdas(n)) / 2;
+            lambdas(n) *= speeds(n) < 0 ? 5 : 0.7;
+            // lambdas(n) = Kokkos::abs(speeds(n) * 100 + lambdas(n)) / 2;
         }
     );
 
@@ -326,7 +341,7 @@ void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &
         "levenberg",
         Kokkos::MDRangePolicy({0, 0}, {A.extent(0), N}),
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
-            A(i, i, n) += lambdas(n);
+            A(i, i, n) += lambdas(n) * A(i, i, n);
         }
     );
 }
