@@ -56,6 +56,7 @@ ViewType load_view(std::string path, Extents &&... extents) {
 void wipe_checkpoint(uint8_t stages);
 void save_checkpoint(
     uint64_t N,
+    uint8_t order,
     uint8_t stages,
     Kokkos::View<double **> &_x, 
     Kokkos::View<double  *> &_norms, 
@@ -64,6 +65,7 @@ void save_checkpoint(
 
 bool load_checkpoint(
     uint8_t stages,
+    uint8_t order,
     Kokkos::View<double **> &_x, 
     Kokkos::View<double  *> &_norms, 
     Kokkos::View<double  *> &_speeds
@@ -71,6 +73,7 @@ bool load_checkpoint(
 
 uint64_t append_solution(
     uint64_t N,
+    uint8_t order,
     uint8_t stages,
     Kokkos::View<double **> &x,
     Kokkos::View<double  *> &_norms,

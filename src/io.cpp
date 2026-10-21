@@ -8,6 +8,7 @@ void wipe_checkpoint(uint8_t stages) {
 
 void save_checkpoint(
     uint64_t N,
+    uint8_t order,
     uint8_t stages,
     Kokkos::View<double **> &_x, 
     Kokkos::View<double  *> &_norms, 
@@ -89,19 +90,20 @@ void save_checkpoint(
         j.push_back(o);
     } 
 
-    std::ofstream out("./cache/tableaux/checkpoints/s" + std::to_string((int) stages) + ".json");
+    std::ofstream out("./cache/tableaux/checkpoints/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages) + ".json");
     out << std::setw(4) << j << std::endl;
     out.close();
 }
 
 bool load_checkpoint(
+    uint8_t order,
     uint8_t stages,
     Kokkos::View<double **> &_x, 
     Kokkos::View<double  *> &_norms, 
     Kokkos::View<double  *> &_speeds
 ) {
     if (!std::filesystem::exists("./cache/tableaux/checkpoints")) std::filesystem::create_directories("./cache/tableaux/checkpoints/");
-    std::string path = "./cache/tableaux/checkpoints/s" + std::to_string((int) stages) + ".json";
+    std::string path = "./cache/tableaux/checkpoints/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages) + ".json";
     if (!std::filesystem::exists(path)) return false;
 
     using json = nlohmann::ordered_json;
@@ -158,6 +160,7 @@ bool load_checkpoint(
 
 uint64_t append_solution(
     uint64_t N,
+    uint8_t order,
     uint8_t stages,
     Kokkos::View<double **> &_x,
     Kokkos::View<double  *> &_norms,
@@ -186,7 +189,7 @@ uint64_t append_solution(
 
     Kokkos::fence();
 
-    std::string path = "./cache/tableaux/solutions/s" + std::to_string((int) stages) + ".json";
+    std::string path = "./cache/tableaux/solutions/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages) + ".json";
     json j;
     if (std::filesystem::exists(path)) {
         std::ifstream f;

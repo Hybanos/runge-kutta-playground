@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
         Kokkos::View<double   *> speeds("speeds", c.N);
 
         if (c.wipe_checkpoint) wipe_checkpoint(c.stages);
-        if (!load_checkpoint(c.stages, x, norms, speeds)) init_x(x, c.seed);
+        if (!load_checkpoint(c.order, c.stages, x, norms, speeds)) init_x(x, c.seed);
         Kokkos::fence();
         c.N = norms.extent(0);
 
@@ -238,7 +238,7 @@ int main(int argc, char **argv) {
             batched_speeds(c.N, norms, norms_last, speeds);
             Kokkos::fence();
 
-            if (append_solution(c.N, c.stages, x, norms, c.accept_tol) >= c.solution_count) break;
+            if (append_solution(c.N, c.order, c.stages, x, norms, c.accept_tol) >= c.solution_count) break;
             Kokkos::fence();
             check_and_swap(c.N, f, x, norms, alphas, speeds, ttl, c.ttl, p.count_trees(), c.accept_tol);
             Kokkos::fence();
@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
                           std::endl;
             }
             Kokkos::fence();
-            if (!(i%c.checkpoint_save_freq)) save_checkpoint(c.N, c.stages, x, norms, speeds);
+            if (!(i%c.checkpoint_save_freq)) save_checkpoint(c.N, c.order, c.stages, x, norms, speeds);
             Kokkos::fence();
             // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }

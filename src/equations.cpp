@@ -195,14 +195,15 @@ host_equations build_equations_or_get_cached(pool &p, uint8_t order, uint8_t sta
 
     host_equations equations;
 
-    if (!std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_params")  ||
-        !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes")   ||
-        !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes") ||
-        !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_facts")   ||
-        !std::filesystem::exists("./cache/equations/s" + std::to_string((int) stages) + "_eq_total")
+    std::string fname_root = "./cache/equations/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages);
+    if (!std::filesystem::exists(fname_root + "_eq_params")  ||
+        !std::filesystem::exists(fname_root + "_eq_sizes")   ||
+        !std::filesystem::exists(fname_root + "_eq_indexes") ||
+        !std::filesystem::exists(fname_root + "_eq_facts")   ||
+        !std::filesystem::exists(fname_root + "_eq_total")
     ) {
         equations = build_equations(p, order, stages);
-        save_equations(stages, order, equations);
+        save_equations(order, stages, equations);
     } else {
         equations = load_equations(order, stages);
     }
@@ -214,10 +215,11 @@ host_jacobian build_jacobian_or_get_cached(pool &p, uint8_t order, uint8_t stage
 
     host_jacobian jacobian;
 
-    if (!std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params")  ||
-        !std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes")   ||
-        !std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes") ||
-        !std::filesystem::exists("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_total")
+    std::string fname_root = "./cache/jacobian/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages);
+    if (!std::filesystem::exists(fname_root + "_jc_params")  ||
+        !std::filesystem::exists(fname_root + "_jc_sizes")   ||
+        !std::filesystem::exists(fname_root + "_jc_indexes") ||
+        !std::filesystem::exists(fname_root + "_jc_total")
     ) {
         jacobian = build_jacobian(p, order, stages, equations);
         save_jacobian(order, stages, jacobian);
@@ -228,26 +230,29 @@ host_jacobian build_jacobian_or_get_cached(pool &p, uint8_t order, uint8_t stage
 }
 
 void save_equations(uint8_t order, uint8_t stages, host_equations &equations) {
-    save_view("./cache/equations/s" + std::to_string((int) stages) + "_eq_params", equations.params);
-    save_view("./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes", equations.sizes);
-    save_view("./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes", equations.indexes);
-    save_view("./cache/equations/s" + std::to_string((int) stages) + "_eq_facts", equations.facts);
-    save_scalar("./cache/equations/s" + std::to_string((int) stages) + "_eq_total", equations.total);
+    std::string fname_root = "./cache/equations/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages);
+    save_view  (fname_root + "_eq_params", equations.params);
+    save_view  (fname_root + "_eq_sizes", equations.sizes);
+    save_view  (fname_root + "_eq_indexes", equations.indexes);
+    save_view  (fname_root + "_eq_facts", equations.facts);
+    save_scalar(fname_root + "_eq_total", equations.total);
 }
 
 void save_jacobian(uint8_t order, uint8_t stages, host_jacobian &jacobian) {
-    save_view("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params", jacobian.params);
-    save_view("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes", jacobian.sizes);
-    save_view("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes", jacobian.indexes);
-    save_scalar("./cache/jacobian/s" + std::to_string((int) stages) + "_jc_total", jacobian.total);
+    std::string fname_root = "./cache/jacobian/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages);
+    save_view  (fname_root + "_jc_params", jacobian.params);
+    save_view  (fname_root + "_jc_sizes", jacobian.sizes);
+    save_view  (fname_root + "_jc_indexes", jacobian.indexes);
+    save_scalar(fname_root + "_jc_total", jacobian.total);
 }
 
 host_equations load_equations(uint8_t order, uint8_t stages) {
-    std::string p1 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_params";
-    std::string p2 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_sizes";
-    std::string p3 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_indexes";
-    std::string p4 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_facts";
-    std::string p5 = "./cache/equations/s" + std::to_string((int) stages) + "_eq_total";
+    std::string fname_root = "./cache/equations/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages);
+    std::string p1 = fname_root + "_eq_params";
+    std::string p2 = fname_root + "_eq_sizes";
+    std::string p3 = fname_root + "_eq_indexes";
+    std::string p4 = fname_root + "_eq_facts";
+    std::string p5 = fname_root + "_eq_total";
 
     return host_equations{
         .params = load_view<decltype(host_equations::params)>(p1, std::filesystem::file_size(p1) / sizeof(uint8_t) / order, order),
@@ -259,10 +264,11 @@ host_equations load_equations(uint8_t order, uint8_t stages) {
 }
 
 host_jacobian load_jacobian(uint8_t order, uint8_t stages) {
-    std::string p1 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_params";
-    std::string p2 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_sizes";
-    std::string p3 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_indexes";
-    std::string p4 = "./cache/jacobian/s" + std::to_string((int) stages) + "_jc_total";
+    std::string fname_root = "./cache/jacobian/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages);
+    std::string p1 = fname_root + "_jc_params";
+    std::string p2 = fname_root + "_jc_sizes";
+    std::string p3 = fname_root + "_jc_indexes";
+    std::string p4 = fname_root + "_jc_total";
 
     return host_jacobian{
         .params = load_view<decltype(host_jacobian::params)>(p1, std::filesystem::file_size(p1) / sizeof(uint8_t) / order, order),
