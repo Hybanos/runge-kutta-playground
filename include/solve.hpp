@@ -11,44 +11,21 @@
 #include "common.hpp"
 #include "equations.hpp"
 
-void init_x(config_t config, context_t context);
+void init_x(config_t &config, context_t &context);
 
-void evaluate_equations(
-    uint32_t N, uint8_t order, uint8_t stages, 
-    device_equations &equations_d, 
-    Kokkos::View<double **> &x, 
-    Kokkos::View<double **> &red, 
-    Kokkos::View<double **> &f
-);
+void evaluate_equations(config_t &config, context_t &context, Kokkos::View<double **> &x, Kokkos::View<double **> &f);
+void evaluate_jacobian(config_t &config, context_t &context);
 
-void evaluate_jacobian(
-    uint32_t N, uint8_t order, uint8_t stages, 
-    device_jacobian &jacobian_d, 
-    Kokkos::View<double **> &x, 
-    Kokkos::View<double **> &red, 
-    Kokkos::View<double ***> &J
-);
-void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double ***> &A);
-void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double **> &f, Kokkos::View<double **> &b);
-void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<double **> &x);
+void batched_transposed_gemm(config_t &config, context_t &context);
+void batched_gemv(config_t &config, context_t &context);
+void batched_gesv(config_t &config, context_t &context);
 void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT);
-void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kokkos::View<double *> &alphas, Kokkos::View<uint8_t  *> &accept);
-void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds, Kokkos::View<uint64_t *> ttl, uint64_t max_ttl, double upper_tol, double lower_tol);
-void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *> &norms);
-void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<double *> &norms_last, Kokkos::View<double *> &speeds);
-void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds, Kokkos::View<uint8_t  *> &accept);
-void backtrack(
-    uint64_t N, uint8_t order, uint8_t stages, 
-    device_equations &equations_d, 
-    Kokkos::View<double **> &x,
-    Kokkos::View<double **> &red,
-    Kokkos::View<double **> &f,
-    Kokkos::View<double **> &f_tmp,
-    Kokkos::View<double **> &dx,
-    Kokkos::View<double **> &x_tmp,
-    Kokkos::View<double  *> &alphas,
-    Kokkos::View<uint8_t  *> &accept
-);
+void update_weights(config_t &config, context_t &context);
+void check_and_swap(config_t &config, context_t &context, double upper_tol);
+void batched_norms(config_t &config, context_t &context);
+void batched_speeds(config_t &config, context_t &context);
+void levenberg(config_t &config, context_t &context);
+void backtrack(config_t &config, context_t &context);
 
 template<class T>
 void simple_copy_and_print_1d(Kokkos::View<T *> &v) {

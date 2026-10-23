@@ -5,7 +5,7 @@ typedef Kokkos::TeamPolicy<>::member_type member_type;
 #define RANDOM_LB -2.0
 #define RANDOM_UB  2.0
 
-void init_x(config_t config, context_t context) {
+void init_x(config_t &config, context_t &context) {
     EXPAND_CONTEXT
     auto seed = config.seed;
 
@@ -26,18 +26,23 @@ void init_x(config_t config, context_t context) {
     );
 }
 
-void evaluate_equations(    
-    uint32_t N, uint8_t order, uint8_t stages, 
-    device_equations &equations_d, 
+void evaluate_equations(
+    config_t &config, 
+    context_t &context, 
     Kokkos::View<double **> &x, 
-    Kokkos::View<double **> &red, 
-    Kokkos::View<double **> &f) {
+    Kokkos::View<double **> &f
+) {
+    auto N = config.N;
+    auto order = config.order;
+    auto stages = config.stages;
+    auto &equations_d = context.equations_d;
+    auto &equations_reduce = context.equations_reduce;
 
     uint8_t total_params = (stages - 1) * (stages - 2) / 2 + stages + stages - 1;
 
     Kokkos::parallel_for(
         "equation_prod_evaluate", 
-        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {equations_d.total, (uint64_t) N}),
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {equations_d.total, N}),
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             double prod = 1.0;
             for (int j = 0; j < order; j++) {
@@ -45,7 +50,7 @@ void evaluate_equations(
                 // multiply by one 1 if we're out of the param range
                 if (index != total_params) prod *= x(index, n);
             }
-            red(i, n) = prod;
+            equations_reduce(i, n) = prod;
         }
     );
 
@@ -65,7 +70,7 @@ void evaluate_equations(
             Kokkos::parallel_reduce(
                 Kokkos::TeamThreadRange(team_member, equations_d.sizes[eq]),
                 [&] (uint64_t i, double &lsum) {
-                    lsum += red(equations_d.indexes[eq] + i, n);
+                    lsum += equations_reduce(equations_d.indexes[eq] + i, n);
                 },
                 sum
             );
@@ -74,12 +79,11 @@ void evaluate_equations(
     );
 }
 
-void evaluate_jacobian(
-    uint32_t N, uint8_t order, uint8_t stages, 
-    device_jacobian &jacobian_d, 
-    Kokkos::View<double **> &x, 
-    Kokkos::View<double **> &red, 
-    Kokkos::View<double ***> &J) {
+void evaluate_jacobian(config_t &config, context_t &context) {
+    EXPAND_CONTEXT
+    auto N = config.N;
+    auto order = config.order;
+    auto stages = config.stages;
 
     uint64_t begin[2] = {0, 0};
     uint64_t end[2] = {jacobian_d.total, N};
@@ -102,7 +106,7 @@ void evaluate_jacobian(
                     prod *= x(index, n);
                 }
             }
-            red(i, n) = prod;
+            jacobian_reduce(i, n) = prod;
         }
     );
 
@@ -110,7 +114,7 @@ void evaluate_jacobian(
     // simple_copy_and_print_2d(red);
     // Kokkos::fence();
 
-    Kokkos::MDRangePolicy<Kokkos::Rank<3>> policy2({0, 0, 0}, {(int) total_params, (int) jacobian_d.sizes.size() / total_params, N});
+    Kokkos::MDRangePolicy<Kokkos::Rank<3>> policy2({0, 0, 0}, {(uint64_t) total_params, (uint64_t) jacobian_d.sizes.size() / total_params, N});
     Kokkos::parallel_for(
         "jacobian_prod_reduce",
         policy2,
@@ -118,7 +122,7 @@ void evaluate_jacobian(
             uint64_t ind = derived * (jacobian_d.sizes.size() / total_params) + eq;
             double sum = 0;
             for (uint64_t i = 0; i < jacobian_d.sizes[ind]; i++) {
-                sum += red(jacobian_d.indexes[ind] + i, n);
+                sum += jacobian_reduce(jacobian_d.indexes[ind] + i, n);
             }
             J(derived, eq, n) = sum;
         }
@@ -152,8 +156,10 @@ void evaluate_jacobian(
 
 }
 
-void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double ***> &A) {
+void batched_transposed_gemm(config_t &config, context_t &context) {
     using namespace KokkosBatched;
+    EXPAND_CONTEXT
+    auto N = config.N;
 
     Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
     // nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare nightmare
@@ -183,8 +189,10 @@ void batched_transposed_gemm(uint64_t N, Kokkos::View<double ***> &J, Kokkos::Vi
     );
 }
 
-void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double **> &f, Kokkos::View<double **> &b) {
+void batched_gemv(config_t &config, context_t &context) {
     using namespace KokkosBatched;
+    EXPAND_CONTEXT
+    auto N = config.N;
 
     Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
 
@@ -203,8 +211,10 @@ void batched_gemv(uint64_t N, Kokkos::View<double ***> &J, Kokkos::View<double *
     );
 }
 
-void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double **> &b, Kokkos::View<double **> &x) {
+void batched_gesv(config_t &config, context_t &context) {
     using namespace KokkosBatched;
+    EXPAND_CONTEXT
+    auto N = config.N;
 
     Kokkos::TeamPolicy<> policy(N, Kokkos::AUTO());
 
@@ -215,7 +225,7 @@ void batched_gesv(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *
             uint64_t n = team_member.league_rank();
             auto _A = Kokkos::subview(A, Kokkos::ALL(), Kokkos::ALL(), n);
             auto _b = Kokkos::subview(b, Kokkos::ALL(), n);
-            auto _x = Kokkos::subview(x, Kokkos::ALL(), n);
+            auto _x = Kokkos::subview(dx, Kokkos::ALL(), n);
             TeamVectorGesv<member_type, Gesv::NoPivoting>::invoke(
                 team_member, _A, _x, _b 
             );
@@ -234,12 +244,10 @@ void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT) {
     );
 }
 
-void update_weights(
-    Kokkos::View<double **> &x, 
-    Kokkos::View<double **> &dx, 
-    Kokkos::View<double *> &alphas, 
-    Kokkos::View<uint8_t  *> &accept
-) {
+void update_weights(config_t &config, context_t &context) {
+    EXPAND_CONTEXT
+    auto N = config.N;
+
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
     Kokkos::parallel_for(
         "update_weights",
@@ -251,19 +259,10 @@ void update_weights(
     );
 }
 
-void check_and_swap(
-    uint64_t N, 
-    Kokkos::View<double **> &f, 
-    Kokkos::View<double **> &x, 
-    Kokkos::View<double *> &norms, 
-    Kokkos::View<double *> &alphas, 
-    Kokkos::View<double *> &lambdas, 
-    Kokkos::View<double *> &speeds, 
-    Kokkos::View<uint64_t *> ttl, 
-    uint64_t max_ttl, 
-    double upper_tol, 
-    double lower_tol
-) {
+void check_and_swap(config_t &config, context_t &context, double upper_tol) {
+    EXPAND_CONTEXT
+    auto N = config.N;
+
     auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
     Kokkos::Random_XorShift64_Pool<> random_pool(t);
 
@@ -280,10 +279,10 @@ void check_and_swap(
                     auto generator = random_pool.get_state();
                     if (
                         norms(n) > upper_tol ||
-                        norms(n) < lower_tol ||
+                        norms(n) < config.accept_tol ||
                         alphas(n) <= 1e-12   ||
                         // Kokkos::log(lambdas(n)) > Kokkos::log(norms(n)) + 10 ||
-                        ttl(n) > max_ttl     ||
+                        ttl(n) > config.ttl     ||
                         Kokkos::isnan(f(i, n))
                     ) {
                         x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
@@ -300,7 +299,10 @@ void check_and_swap(
     );
 }
 
-void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *> &norms) {
+void batched_norms(config_t &config, context_t &context) {
+    EXPAND_CONTEXT
+    auto N = config.N;
+
     Kokkos::parallel_for(
         "batched norms",
         Kokkos::TeamPolicy<>(N, Kokkos::AUTO()),
@@ -321,12 +323,10 @@ void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *
     );
 }
 
-void batched_speeds(
-    uint64_t N, 
-    Kokkos::View<double *> &norms, 
-    Kokkos::View<double *> &norms_last, 
-    Kokkos::View<double *> &speeds
-) {
+void batched_speeds(config_t &config, context_t &context) {
+    EXPAND_CONTEXT
+    auto N = config.N;
+
     Kokkos::parallel_for(
         "batched speeds",
         Kokkos::RangePolicy(0, N),
@@ -337,13 +337,10 @@ void batched_speeds(
     );
 }
 
-void levenberg(
-    uint64_t N, 
-    Kokkos::View<double ***> &A, 
-    Kokkos::View<double *> &lambdas, 
-    Kokkos::View<double *> &speeds,
-    Kokkos::View<uint8_t  *> &accept
-) {
+void levenberg(config_t &config, context_t &context) {
+    EXPAND_CONTEXT
+    auto N = config.N;
+
     Kokkos::parallel_for(
         "lambda rescale",
         Kokkos::RangePolicy(0, N),
@@ -365,18 +362,9 @@ void levenberg(
     );
 }
 
-void backtrack(
-    uint64_t N, uint8_t order, uint8_t stages, 
-    device_equations &equations_d, 
-    Kokkos::View<double **> &x,
-    Kokkos::View<double **> &red,
-    Kokkos::View<double **> &f,
-    Kokkos::View<double **> &f_tmp,
-    Kokkos::View<double **> &dx,
-    Kokkos::View<double **> &x_tmp,
-    Kokkos::View<double  *> &alphas,
-    Kokkos::View<uint8_t  *> &accept
-) {
+void backtrack(config_t &config, context_t &context) {
+    EXPAND_CONTEXT
+    auto N = config.N;
     // Kokkos::deep_copy(alphas, 1e3);
 
     Kokkos::parallel_for(
@@ -397,7 +385,7 @@ void backtrack(
         );
         Kokkos::fence();
 
-        evaluate_equations(N, order, stages, equations_d, x_tmp, red, f_tmp);
+        evaluate_equations(config, context, x_tmp, f_tmp);
         Kokkos::fence();
 
         Kokkos::parallel_for(

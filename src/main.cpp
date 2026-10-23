@@ -10,10 +10,8 @@
 #include "common.hpp"
 #include "tree.hpp"
 #include "combi.hpp"
-#include "equations.hpp"
 #include "solve.hpp"
 #include "io.hpp"
-
 
 int main(int argc, char **argv) {
     Kokkos::initialize(argc, argv);
@@ -168,12 +166,12 @@ int main(int argc, char **argv) {
 
         for (int i = 0; i < config.max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
-            evaluate_equations(config.N, config.order, config.stages, context.equations_d, context.x, context.equations_reduce, context.f);
-            evaluate_jacobian(config.N, config.order, config.stages, context.jacobian_d, context.x, context.jacobian_reduce, context.J);
+            evaluate_equations(config, context, context.x, context.f);
+            evaluate_jacobian(config, context);
             Kokkos::fence();
 
             // compute A = J.T @ J
-            batched_transposed_gemm(config.N, context.J, context.A);
+            batched_transposed_gemm(config, context);
 
             // compute b = -J.T @ f
             for (int n = 0; n < config.N; n++) {
@@ -187,10 +185,11 @@ int main(int argc, char **argv) {
 
             // Ghetto-Levenberg-Marquartdt
             Kokkos::deep_copy(context.accept, true);
-            if (config.use_levenberg) levenberg(config.N, context.A, context.lambdas, context.speeds, context.accept);
+            if (config.use_levenberg) levenberg(config, context);
+            Kokkos::fence();
 
             // solve A @ dx = b for dx
-            batched_gesv(config.N, context.A, context.b, context.dx);
+            batched_gesv(config, context);
             Kokkos::fence();
 
             if (config.dump_state) {
@@ -204,23 +203,23 @@ int main(int argc, char **argv) {
 
             // backtrack
             if (config.use_backtrack) {
-                backtrack(config.N, config.order, config.stages, context.equations_d, context.x, context.equations_reduce, context.f, context.f_tmp, context.dx, context.x_tmp, context.alphas, context.accept);
+                backtrack(config, context);
             } else {
                 Kokkos::deep_copy(context.alphas, 1);
             }
             Kokkos::fence();
 
             // update x
-            update_weights(context.x, context.dx, context.alphas, context.accept);
+            update_weights(config, context);
             Kokkos::fence();
 
-            batched_norms(config.N, context.f, context.norms);
-            batched_speeds(config.N, context.norms, context.norms_last, context.speeds);
+            batched_norms(config, context);
+            batched_speeds(config, context);
             Kokkos::fence();
 
             if (append_solution(config.N, config.order, config.stages, context.x, context.norms, config.accept_tol) >= config.solution_count) break;
             Kokkos::fence();
-            check_and_swap(config.N, context.f, context.x, context.norms, context.alphas, context.lambdas, context.speeds, context.ttl, config.ttl, p.count_trees(), config.accept_tol);
+            check_and_swap(config, context, p.count_trees());
             Kokkos::fence();
 
             if (!(i%config.print_freq)) {
