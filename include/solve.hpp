@@ -35,7 +35,7 @@ void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kok
 void check_and_swap(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double **> &x, Kokkos::View<double *> &norms, Kokkos::View<double *> &alphas, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds, Kokkos::View<uint64_t *> ttl, uint64_t max_ttl, double upper_tol, double lower_tol);
 void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *> &norms);
 void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<double *> &norms_last, Kokkos::View<double *> &speeds);
-void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds);
+void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds, Kokkos::View<uint8_t  *> &accept);
 void backtrack(
     uint64_t N, uint8_t order, uint8_t stages, 
     device_equations &equations_d, 

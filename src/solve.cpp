@@ -231,8 +231,12 @@ void transpose(Kokkos::View<double ***> &v, Kokkos::View<double ***> &vT) {
     );
 }
 
-void update_weights(Kokkos::View<double **> &x, Kokkos::View<double **> &dx, Kokkos::View<double *> &alphas, Kokkos::View<uint8_t  *> &accept) {
-    double bound = 1e-3;
+void update_weights(
+    Kokkos::View<double **> &x, 
+    Kokkos::View<double **> &dx, 
+    Kokkos::View<double *> &alphas, 
+    Kokkos::View<uint8_t  *> &accept
+) {
     Kokkos::MDRangePolicy<Kokkos::Rank<2>> policy({0, 0}, {x.extent(0), x.extent(1)});
     Kokkos::parallel_for(
         "update_weights",
@@ -275,7 +279,7 @@ void check_and_swap(
                         norms(n) > upper_tol ||
                         norms(n) < lower_tol ||
                         alphas(n) <= 1e-12   ||
-                        Kokkos::log(lambdas(n)) > Kokkos::log(norms(n)) + 10 ||
+                        // Kokkos::log(lambdas(n)) > Kokkos::log(norms(n)) + 10 ||
                         ttl(n) > max_ttl     ||
                         Kokkos::isnan(f(i, n))
                     ) {
@@ -314,7 +318,12 @@ void batched_norms(uint64_t N, Kokkos::View<double **> &f, Kokkos::View<double *
     );
 }
 
-void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<double *> &norms_last, Kokkos::View<double *> &speeds) {
+void batched_speeds(
+    uint64_t N, 
+    Kokkos::View<double *> &norms, 
+    Kokkos::View<double *> &norms_last, 
+    Kokkos::View<double *> &speeds
+) {
     Kokkos::parallel_for(
         "batched speeds",
         Kokkos::RangePolicy(0, N),
@@ -325,12 +334,19 @@ void batched_speeds(uint64_t N, Kokkos::View<double *> &norms, Kokkos::View<doub
     );
 }
 
-void levenberg(uint64_t N, Kokkos::View<double ***> &A, Kokkos::View<double *> &lambdas, Kokkos::View<double *> &speeds) {
+void levenberg(
+    uint64_t N, 
+    Kokkos::View<double ***> &A, 
+    Kokkos::View<double *> &lambdas, 
+    Kokkos::View<double *> &speeds,
+    Kokkos::View<uint8_t  *> &accept
+) {
     Kokkos::parallel_for(
         "lambda rescale",
         Kokkos::RangePolicy(0, N),
         KOKKOS_LAMBDA (uint64_t n) {
             lambdas(n) *= speeds(n) < 0 ? 5 : 0.7;
+            // lambdas(n) *= speeds(n) < 0 ? 1.5 : 0.2;
             // lambdas(n) = Kokkos::abs(speeds(n) * 100 + lambdas(n)) / 2;
         }
     );
