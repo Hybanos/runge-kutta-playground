@@ -8,9 +8,10 @@
 #include <KokkosBatched_Gesv_Impl.hpp>
 #include <fmt/format.h>
 
+#include "common.hpp"
 #include "equations.hpp"
 
-void init_x(Kokkos::View<double **> &x, long seed);
+void init_x(config_t config, context_t context);
 
 void evaluate_equations(
     uint32_t N, uint8_t order, uint8_t stages, 

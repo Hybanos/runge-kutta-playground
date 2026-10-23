@@ -1,66 +1,19 @@
 #include <iostream>
 #include <filesystem>
+#include <thread>
 
 #include <Kokkos_Core.hpp>
 #include <KokkosBlas3_gemm.hpp>
 #include <KokkosLapack_gesv.hpp>
 #include <CLI/CLI.hpp>
-#include <thread>
 
+#include "common.hpp"
 #include "tree.hpp"
 #include "combi.hpp"
 #include "equations.hpp"
 #include "solve.hpp"
 #include "io.hpp"
 
-struct config_t {
-    uint64_t N = 0;
-    uint8_t stages = 3;
-    uint8_t order = 3;
-    uint64_t max_iter = -1;
-    uint64_t checkpoint_save_freq = 100;
-    uint64_t print_freq = 1;
-    uint64_t solution_count = -1;
-    uint64_t ttl = -1;
-    long seed = 0;
-
-    double accept_tol = 1e-12;
-
-    bool use_backtrack = true;
-    bool use_levenberg = true;
-
-    bool dump_equations = false;
-    bool dump_state = false;
-    bool dump_mem = false;
-
-    bool wipe_checkpoint = false;
-};
-
-struct context_t {
-    device_equations equations_d;
-    device_jacobian jacobian_d;
-
-    Kokkos::View<double  **> x;
-    Kokkos::View<double   *> norms;
-    Kokkos::View<double   *> speeds;
-
-    Kokkos::View<double  **> equations_reduce;
-    Kokkos::View<double  **> jacobian_reduce;
-
-    // Kokkos::View<int     **> ipiv;
-    Kokkos::View<double  **> f;
-    Kokkos::View<double  **> f_tmp;
-    Kokkos::View<double ***> J;
-    Kokkos::View<double ***> A;
-    Kokkos::View<double  **> b;
-    Kokkos::View<double  **> dx;
-    Kokkos::View<double  **> x_tmp;
-    Kokkos::View<double   *> norms_last;
-    Kokkos::View<double   *> alphas;
-    Kokkos::View<double   *> lambdas;
-    Kokkos::View<uint8_t  *> accept;
-    Kokkos::View<uint64_t *> ttl;
-};
 
 int main(int argc, char **argv) {
     Kokkos::initialize(argc, argv);
@@ -157,7 +110,7 @@ int main(int argc, char **argv) {
         context.speeds = Kokkos::View<double   *>("speeds", config.N);
 
         if (config.wipe_checkpoint) wipe_checkpoint(config.stages);
-        if (!load_checkpoint(config.order, config.stages, context.x, context.norms, context.speeds)) init_x(context.x, config.seed);
+        if (!load_checkpoint(config.order, config.stages, context.x, context.norms, context.speeds)) init_x(config, context);
         Kokkos::fence();
         config.N = context.norms.extent(0);
 
