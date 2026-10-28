@@ -14,11 +14,11 @@ target_link_libraries(generator PRIVATE Kokkos::kokkos Kokkos::kokkoskernels nlo
 
 target_compile_features(generator PRIVATE cxx_std_20)
 
-set(GENERATED_CPP "${CMAKE_CURRENT_BINARY_DIR}/gen/p3_s3.cpp")
+set(GENERATED_CPP "${CMAKE_CURRENT_BINARY_DIR}/gen/p$ENV{ORDER}_s$ENV{STAGES}.cpp")
 
 add_custom_command(
     OUTPUT "${GENERATED_CPP}"
-    COMMAND $<TARGET_FILE:generator> 3 3
+    COMMAND $<TARGET_FILE:generator> $ENV{ORDER} $ENV{STAGES}
     DEPENDS generator
     VERBATIM
 )

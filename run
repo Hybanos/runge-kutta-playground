@@ -39,7 +39,14 @@ if [[ $1 == "--hip" ]]; then
     dir=build-hip
 fi
 
+if [[ -z "$ORDER" || -z "$STAGES" ]]; then
+    echo "no order or stages set"
+    exit 1
+fi
+
 cmake -B $dir $options $build \
+    -DORDER=$ORDER \
+    -DSTAGES=$STAGES \
     -DCMAKE_BUILD_TYPE=Release \
     -DKokkosKernels_ENABLE_COMPONENT_COMMON=ON \
     -DKokkosKernels_ENABLE_COMPONENT_BATCHED=OFF \
@@ -49,5 +56,5 @@ cmake -B $dir $options $build \
     -DKokkosKernels_ENABLE_COMPONENT_SPARSE=OFF \
     -DKokkosKernels_ENABLE_COMPONENT_ODE=OFF || exit
 cmake --build $dir --parallel || exit
-time $dir/src/$EXEC $@ || exit
+time $dir/src/$EXEC $@ -p $ORDER -s $STAGES || exit
 

@@ -6,6 +6,8 @@ sudo docker run -it --rm \
     --device=/dev/dri \
     --group-add=video \
     --group-add=render \
+    -e ORDER=$ORDER \
+    -e STAGES=$STAGES \
     -v .:/src \
     -e EXEC=$EXEC \
     rocm-cmake $@
