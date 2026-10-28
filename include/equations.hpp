@@ -97,10 +97,10 @@ __inline__ std::string get_factor(uint8_t index, uint8_t stages) {
     if (index >= one_index) return std::to_string(index - one_index + 1);
 
     if (index < stages) 
-        return "b_" + std::to_string((int) index);
+        return "b_" + std::to_string((int) index + 1);
 
     if (index < stages + stages - 1)
-        return "c_" + std::to_string((int) index - stages + 1);
+        return "c_" + std::to_string((int) index - stages + 2);
    
     uint8_t off = index - stages - stages + 1;
     uint8_t label_1 = 0;
@@ -112,7 +112,7 @@ __inline__ std::string get_factor(uint8_t index, uint8_t stages) {
             label_2 = 0;
         }
     }
-    return "a_" + std::to_string((int) label_1 + 2) + std::to_string((int) label_2 + 1);
+    return "a_" + std::to_string((int) label_1 + 3) + "_" + std::to_string((int) label_2 + 2);
 }
 
 host_equations build_equations_or_get_cached(pool &p, uint8_t order, uint8_t stages);

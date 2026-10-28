@@ -1,4 +1,4 @@
-set(executables main bench)
+set(executables main bench system_kernel_gen)
 
 foreach(exec ${executables})
 

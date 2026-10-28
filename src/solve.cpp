@@ -5,6 +5,9 @@ typedef Kokkos::TeamPolicy<>::member_type member_type;
 #define RANDOM_LB -2.0
 #define RANDOM_UB  2.0
 
+void eval_generated_equations(Kokkos::View<double **> &x, Kokkos::View<double **> &f);
+void eval_generated_jacobian(Kokkos::View<double **> &x, Kokkos::View<double **> &J);
+
 void init_x(config_t &config, context_t &context) {
     EXPAND_CONTEXT
     auto seed = config.seed;
