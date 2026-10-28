@@ -47,5 +47,4 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cli11)
 
-
 add_subdirectory(src)

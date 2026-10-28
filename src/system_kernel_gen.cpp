@@ -25,20 +25,30 @@ int main(int argc, char **argv) {
         host_equations equations_h = build_equations_or_get_cached(p, order, stages);
         host_jacobian jacobian_h = build_jacobian_or_get_cached(p, order, stages, equations_h);
 
-        if (!std::filesystem::exists("./include/gen/")) std::filesystem::create_directories("./include/gen/");
+        if (!std::filesystem::exists("./gen/")) std::filesystem::create_directories("./gen/");
 
-        std::string path = "./include/gen/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages) + ".hpp";
+        std::string path = "./gen/p" + std::to_string((int) order) + "_s" + std::to_string((int) stages) + ".cpp";
         std::ofstream out(path);
         
         out << R"(#include <Kokkos_Core.hpp>
 
 #include "common.hpp"
 
-void eval_generated_equations(Kokkos::View<double **> &x, Kokkos::View<double **> &f, uint64_t n) {
+void eval_generated_equations(
+    config_t &config,
+    context_t &context,
+    Kokkos::View<double **> &x, 
+    Kokkos::View<double **> &f
+    ) {
+    Kokkos::parallel_for(
+        "equation_evaluate",
+        Kokkos::RangePolicy(0, config.N),
+        KOKKOS_LAMBDA (uint64_t n) {
+
 )";
 
         for (int i = 0; i < total_params; i++) {
-            out << "    double " + get_factor(i, stages) << " = x(" << std::to_string(i) << ", n);" << std::endl;
+            out << "\t\t\tdouble " + get_factor(i, stages) << " = x(" << std::to_string(i) << ", n);" << std::endl;
         }
 
         out << std::endl;
@@ -47,7 +57,7 @@ void eval_generated_equations(Kokkos::View<double **> &x, Kokkos::View<double **
             uint32_t size = equations_h.sizes[i];
             uint32_t index = equations_h.indexes[i];
 
-            out << "    f(" << i << ", n) = ";
+            out << "\t\t\tf(" << i << ", n) = ";
 
             for (int k = 0; k < size; k += 1) {
                 for (int l = 0; l < order; l++) {
@@ -62,13 +72,24 @@ void eval_generated_equations(Kokkos::View<double **> &x, Kokkos::View<double **
             out << ";" << std::endl;
         }    
         
+        out << "\t\t}\n\t);" << std::endl;
         out << "}" << std::endl << std::endl;
 
         // jacobian
-        out << "void eval_generated_jacobian(Kokkos::View<double **> &x, Kokkos::View<double **> &J, uint64_t n) {" << std::endl;
+        out << R"(void eval_generated_jacobian(
+    config_t &config,
+    context_t &context
+    ) {
+    auto &x = context.x;
+    auto &J = context.J;
+    Kokkos::parallel_for(
+        "equation_evaluate",
+        Kokkos::RangePolicy(0, config.N),
+        KOKKOS_LAMBDA (uint64_t n) {
+)";
 
         for (int i = 0; i < total_params; i++) {
-            out << "    double " + get_factor(i, stages) << " = x(" << std::to_string(i) << ", n);" << std::endl;
+            out << "\t\t\tdouble " + get_factor(i, stages) << " = x(" << std::to_string(i) << ", n);" << std::endl;
         }
 
         out << std::endl;
@@ -80,10 +101,13 @@ void eval_generated_equations(Kokkos::View<double **> &x, Kokkos::View<double **
 
             if (i % (jacobian_h.sizes.size() / total_params) == 0) {
                 derivation_param++;
-                out << "    // derivating over " + get_factor(derivation_param, stages) << std::endl;
+                out << "\t\t\t// derivating over " + get_factor(derivation_param, stages) << std::endl;
             }
 
-            out << "    J(" << std::to_string(i) << ", n) = ";
+            out << "\t\t\tJ(" 
+                << std::to_string(derivation_param) << ", " 
+                << std::to_string(i % (jacobian_h.sizes.size() / total_params)) << ", "
+                << "n) = ";
 
             for (int k = 0; k < size; k += 1) {
                 for (int l = 0; l < order; l++) {
@@ -98,6 +122,7 @@ void eval_generated_equations(Kokkos::View<double **> &x, Kokkos::View<double **
             out << ";" << std::endl;
         }    
         
+        out << "\t\t}\n\t);" << std::endl;
         out << "}" << std::endl;
 
         out.close();

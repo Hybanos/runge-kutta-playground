@@ -13,8 +13,19 @@
 
 void init_x(config_t &config, context_t &context);
 
-void evaluate_equations(config_t &config, context_t &context, Kokkos::View<double **> &x, Kokkos::View<double **> &f);
-void evaluate_jacobian(config_t &config, context_t &context);
+void eval_generated_equations(
+    config_t &config,
+    context_t &context,
+    Kokkos::View<double **> &x, 
+    Kokkos::View<double **> &f
+);
+void eval_generated_jacobian(
+    config_t &config,
+    context_t &context
+);
+
+// void evaluate_equations(config_t &config, context_t &context, Kokkos::View<double **> &x, Kokkos::View<double **> &f);
+// void evaluate_jacobian(config_t &config, context_t &context);
 
 void batched_transposed_gemm(config_t &config, context_t &context);
 void batched_gemv(config_t &config, context_t &context);

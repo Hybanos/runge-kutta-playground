@@ -171,8 +171,10 @@ int main(int argc, char **argv) {
         for (int i = 0; i < config.max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
 
-            evaluate_equations(config, context, context.x, context.f);
-            evaluate_jacobian(config, context);
+            // evaluate_equations(config, context, context.x, context.f);
+            eval_generated_equations(config, context, context.x, context.f);
+            // evaluate_jacobian(config, context);
+            eval_generated_jacobian(config, context);
             Kokkos::fence();
 
             // compute A = J.T @ J
@@ -193,29 +195,6 @@ int main(int argc, char **argv) {
             } else {
                 newton_iteration(config, context);
             }
-
-            // // Ghetto-Levenberg-Marquartdt
-            // Kokkos::deep_copy(context.accept, true);
-            // if (config.use_levenberg) levenberg(config, context);
-            // Kokkos::fence();
-
-            // // solve A @ dx = b for dx
-            // batched_gesv(config, context);
-            // Kokkos::fence();
-
-            // debug_state(config, context);
-
-            // // backtrack
-            // if (config.use_backtrack) {
-            //     backtrack(config, context);
-            // } else {
-            //     Kokkos::deep_copy(context.alphas, 1);
-            // }
-            // Kokkos::fence();
-
-            // // update x
-            // update_weights(config, context);
-            // Kokkos::fence();
 
             batched_norms(config, context);
             batched_speeds(config, context);

@@ -3,7 +3,7 @@ build*/
 .vscode/
 ov1/
 cache/
-include/gen/
+src/gen/
 *.nsys*
 *.sqlite
 *.txt
