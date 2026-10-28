@@ -254,7 +254,7 @@ void update_weights(config_t &config, context_t &context) {
         policy,
         KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
             // x(i, n) += Kokkos::max(Kokkos::abs(dx(i, n)), bound) * (dx(i, n) / Kokkos::abs(dx(i, n)));
-            x(i, n) += alphas(n) * dx(i, n) * accept(n);
+            x(i, n) += dx(i, n) * accept(n);
         }
     );
 }
@@ -278,16 +278,14 @@ void check_and_swap(config_t &config, context_t &context, double upper_tol) {
                 [&] (uint64_t i) {
                     auto generator = random_pool.get_state();
                     if (
-                        norms(n) > upper_tol ||
+                        norms(n) > upper_tol         ||
                         norms(n) < config.accept_tol ||
-                        alphas(n) <= 1e-12   ||
-                        // Kokkos::log(lambdas(n)) > Kokkos::log(norms(n)) + 10 ||
-                        ttl(n) > config.ttl     ||
+                        ttl(n) > config.ttl          ||
+                        lambdas(n) > 999             ||
                         Kokkos::isnan(f(i, n))
                     ) {
                         x(i, n) = generator.drand(RANDOM_LB, RANDOM_UB);
                         lambdas(n) = 1e-4;
-                        alphas(n) = 1e-10;
                         ttl(n) = 0;
                         // Kokkos::printf("haha %f %f ", norm, tol);
                     }
@@ -345,7 +343,8 @@ void levenberg(config_t &config, context_t &context) {
         "lambda rescale",
         Kokkos::RangePolicy(0, N),
         KOKKOS_LAMBDA (uint64_t n) {
-            lambdas(n) *= speeds(n) < 0 ? 5 : 0.7;
+            lambdas(n) *= accept(n) ? 0.7 : 5;
+            lambdas(n) = Kokkos::min(lambdas(n), 1e3);
             // lambdas(n) *= speeds(n) < 0 ? 1.5 : 0.2;
             // lambdas(n) = Kokkos::abs(speeds(n) * 100 + lambdas(n)) / 2;
         }
@@ -368,64 +367,48 @@ void backtrack(config_t &config, context_t &context) {
     // Kokkos::deep_copy(alphas, 1e3);
 
     Kokkos::parallel_for(
-        "apha rescale",
-        Kokkos::RangePolicy(0, N),
-        KOKKOS_LAMBDA (uint64_t n) {
-            alphas(n) *= 10.0;
+        "x + alpha * dx",
+        Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {x.extent(0), N}),
+        KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
+            x_tmp(i, n) = x(i, n) + dx(i, n);
         }
     );
+    Kokkos::fence();
 
-    for (int backtrack_i = 0; backtrack_i < 3; backtrack_i++) {
-        Kokkos::parallel_for(
-            "x + alpha * dx",
-            Kokkos::MDRangePolicy<Kokkos::Rank<2>>({0, 0}, {x.extent(0), N}),
-            KOKKOS_LAMBDA (uint64_t i, uint64_t n) {
-                x_tmp(i, n) = x(i, n) + alphas(n) * dx(i, n);
-            }
-        );
-        Kokkos::fence();
+    evaluate_equations(config, context, x_tmp, f_tmp);
+    Kokkos::fence();
 
-        evaluate_equations(config, context, x_tmp, f_tmp);
-        Kokkos::fence();
+    Kokkos::parallel_for(
+        "norms and compare",
+        Kokkos::TeamPolicy<>(N, Kokkos::AUTO()),
+        KOKKOS_LAMBDA (const member_type &team_member) {
+            uint64_t n = team_member.league_rank();
 
-        Kokkos::parallel_for(
-            "norms and compare",
-            Kokkos::TeamPolicy<>(N, Kokkos::AUTO()),
-            KOKKOS_LAMBDA (const member_type &team_member) {
-                uint64_t n = team_member.league_rank();
+            // custom reductor ?
+            double norm_1;
+            Kokkos::parallel_reduce(
+                Kokkos::TeamThreadRange(team_member, f.extent(0)),
+                [&] (uint64_t i, double &lnorm) {
+                    lnorm += f(i, n) * f(i, n);
+                },
+                norm_1
+            );
+            team_member.team_barrier();
 
-                // custom reductor ?
-                double norm_1;
-                Kokkos::parallel_reduce(
-                    Kokkos::TeamThreadRange(team_member, f.extent(0)),
-                    [&] (uint64_t i, double &lnorm) {
-                        lnorm += f(i, n) * f(i, n);
-                    },
-                    norm_1
-                );
-                team_member.team_barrier();
+            double norm_2;
+            Kokkos::parallel_reduce(
+                Kokkos::TeamThreadRange(team_member, f.extent(0)),
+                [&] (uint64_t i, double &lnorm) {
+                    lnorm += f_tmp(i, n) * f_tmp(i, n);
+                },
+                norm_2
+            );
+            team_member.team_barrier();
 
-                double norm_2;
-                Kokkos::parallel_reduce(
-                    Kokkos::TeamThreadRange(team_member, f.extent(0)),
-                    [&] (uint64_t i, double &lnorm) {
-                        lnorm += f_tmp(i, n) * f_tmp(i, n);
-                    },
-                    norm_2
-                );
-                team_member.team_barrier();
+            accept(n) = norm_1 > norm_2;
 
-                norm_1 = Kokkos::sqrt(norm_1);
-                norm_2 = Kokkos::sqrt(norm_2);
-
-                if (norm_2 > (1 - 1e-10*alphas(n)) * norm_1) {
-                    // if (alphas(n) > 1e-3) alphas(n) *= 0.8;
-                    alphas(n) *= 0.1;
-                    if (backtrack_i == 2) accept(n) = false;
-                }
-                team_member.team_barrier();
-            }
-        );
-        Kokkos::fence();
-    }
+            team_member.team_barrier();
+        }
+    );
+    Kokkos::fence();
 }

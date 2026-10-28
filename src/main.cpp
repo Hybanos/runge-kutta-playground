@@ -13,6 +13,12 @@
 #include "solve.hpp"
 #include "io.hpp"
 
+void debug_state(config_t &config, context_t &context);
+void info_iter(config_t &config, context_t &context, uint64_t i, uint64_t time);
+
+void newton_iteration(config_t &config, context_t &context);
+void lm_iteration(config_t &config, context_t &context);
+
 int main(int argc, char **argv) {
     Kokkos::initialize(argc, argv);
     {
@@ -26,7 +32,7 @@ int main(int argc, char **argv) {
         app.add_flag("--hip");
         app.add_flag("--cuda");
 
-        app.add_flag_callback("--no-backtrack", [&](){config.use_backtrack = false;});
+        // app.add_flag_callback("--no-backtrack", [&](){config.use_backtrack = false;});
         app.add_flag_callback("--no-levenberg", [&](){config.use_levenberg = false;});
 
         app.add_option("-N,-n", config.N, "Number of tableaux to compute in parallel");
@@ -107,7 +113,7 @@ int main(int argc, char **argv) {
         context.norms = Kokkos::View<double   *>("norms", config.N);
         context.speeds = Kokkos::View<double   *>("speeds", config.N);
 
-        if (config.wipe_checkpoint) wipe_checkpoint(config.stages);
+        if (config.wipe_checkpoint) wipe_checkpoint(config.order, config.stages);
         if (!load_checkpoint(config.order, config.stages, context.x, context.norms, context.speeds)) init_x(config, context);
         Kokkos::fence();
         config.N = context.norms.extent(0);
@@ -124,7 +130,6 @@ int main(int argc, char **argv) {
         context.dx = Kokkos::View<double  **>("dx", total_params, config.N);
         context.x_tmp = Kokkos::View<double  **>("x_tmp", total_params, config.N);
         context.norms_last = Kokkos::View<double   *>("norms_last", config.N);
-        context.alphas = Kokkos::View<double   *>("alphas", config.N);
         context.lambdas = Kokkos::View<double   *>("lambdas", config.N);
         context.accept = Kokkos::View<uint8_t  *>("accept", config.N);
         context.ttl = Kokkos::View<uint64_t *>("ttl", config.N);
@@ -154,18 +159,18 @@ int main(int argc, char **argv) {
                 context.dx.label() << " " << context.dx.size()  * 8 << "\n" <<
                 context.x_tmp.label() << " " << context.x_tmp.size()  * 8 << "\n" <<
                 context.norms_last.label() << " " << context.norms_last.size()  * 8 << "\n" <<
-                context.alphas.label() << " " << context.alphas.size()  * 8 << "\n" <<
                 context.lambdas.label() << " " << context.lambdas.size()  * 8 << "\n" <<
                 context.accept.label() << " " << context.accept.size()  * 1 << "\n" <<
                 context.ttl.label() << " " << context.ttl.size()  * 8 << std::endl;
         }
 
         Kokkos::deep_copy(context.ttl, 0);
-        Kokkos::deep_copy(context.alphas, 1e-10);
-        Kokkos::deep_copy(context.lambdas, 1e-4);
+        Kokkos::deep_copy(context.lambdas, 1e-10);
+        Kokkos::deep_copy(context.accept, true);
 
         for (int i = 0; i < config.max_iter; i++) {
             auto t1 = std::chrono::high_resolution_clock::now();
+
             evaluate_equations(config, context, context.x, context.f);
             evaluate_jacobian(config, context);
             Kokkos::fence();
@@ -183,35 +188,34 @@ int main(int argc, char **argv) {
             // batched_gemv(N, J, f, b);
             Kokkos::fence();
 
-            // Ghetto-Levenberg-Marquartdt
-            Kokkos::deep_copy(context.accept, true);
-            if (config.use_levenberg) levenberg(config, context);
-            Kokkos::fence();
-
-            // solve A @ dx = b for dx
-            batched_gesv(config, context);
-            Kokkos::fence();
-
-            if (config.dump_state) {
-                simple_copy_and_print_2d(context.x);
-                simple_copy_and_print_2d(context.f);
-                simple_copy_and_print_3d(context.J);
-                simple_copy_and_print_3d(context.A);
-                simple_copy_and_print_2d(context.b);
-                simple_copy_and_print_2d(context.dx);
-            }
-
-            // backtrack
-            if (config.use_backtrack) {
-                backtrack(config, context);
+            if (config.use_levenberg) {
+                lm_iteration(config, context);
             } else {
-                Kokkos::deep_copy(context.alphas, 1);
+                newton_iteration(config, context);
             }
-            Kokkos::fence();
 
-            // update x
-            update_weights(config, context);
-            Kokkos::fence();
+            // // Ghetto-Levenberg-Marquartdt
+            // Kokkos::deep_copy(context.accept, true);
+            // if (config.use_levenberg) levenberg(config, context);
+            // Kokkos::fence();
+
+            // // solve A @ dx = b for dx
+            // batched_gesv(config, context);
+            // Kokkos::fence();
+
+            // debug_state(config, context);
+
+            // // backtrack
+            // if (config.use_backtrack) {
+            //     backtrack(config, context);
+            // } else {
+            //     Kokkos::deep_copy(context.alphas, 1);
+            // }
+            // Kokkos::fence();
+
+            // // update x
+            // update_weights(config, context);
+            // Kokkos::fence();
 
             batched_norms(config, context);
             batched_speeds(config, context);
@@ -222,19 +226,10 @@ int main(int argc, char **argv) {
             check_and_swap(config, context, p.count_trees());
             Kokkos::fence();
 
-            if (!(i%config.print_freq)) {
-                
-                simple_copy_and_print_1d(context.norms);
-                simple_copy_and_print_1d(context.lambdas);
-                simple_copy_and_print_1d(context.alphas);
+            auto t2 = std::chrono::high_resolution_clock::now();
+            
+            info_iter(config, context, i, (t2 - t1).count());
 
-                auto t2 = std::chrono::high_resolution_clock::now();
-                std::cout << i << " " << 
-                          "ips: " << (int) (1.0 / ((t2 - t1).count() / 1e9) * config.N) << 
-                          ", " << (t2 - t1).count() / 1e9 << "s" << 
-                          std::endl;
-            }
-            Kokkos::fence();
             if (!(i%config.checkpoint_save_freq)) save_checkpoint(config.N, config.order, config.stages, context.x, context.norms, context.speeds);
             Kokkos::fence();
             // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -243,4 +238,62 @@ int main(int argc, char **argv) {
     Kokkos::finalize();
 
     return 0;
+}
+
+void debug_state(config_t &config, context_t &context) {
+    if (config.dump_state) {
+        simple_copy_and_print_2d(context.x);
+        simple_copy_and_print_2d(context.f);
+        simple_copy_and_print_3d(context.J);
+        simple_copy_and_print_3d(context.A);
+        simple_copy_and_print_2d(context.b);
+        simple_copy_and_print_2d(context.dx);
+    }
+    Kokkos::fence();
+}
+
+void info_iter(config_t &config, context_t &context, uint64_t i, uint64_t time) {
+    if (!(i%config.print_freq)) {
+        
+        simple_copy_and_print_1d(context.norms);
+        simple_copy_and_print_1d(context.lambdas);
+
+        std::cout << i << " " << 
+                    "ips: " << (int) (1.0 / (time / 1e9) * config.N) << 
+                    ", " << time / 1e9 << "s" << 
+                    std::endl;
+    }
+    Kokkos::fence();
+
+}
+
+void newton_iteration(config_t &config, context_t &context) {
+    // solve A @ dx = b for dx
+    batched_gesv(config, context);
+    Kokkos::fence();
+
+    debug_state(config, context);
+
+    // update x
+    Kokkos::deep_copy(context.lambdas, 1);
+    Kokkos::deep_copy(context.accept, 1);
+    Kokkos::fence();
+    update_weights(config, context);
+    Kokkos::fence();
+}
+
+void lm_iteration(config_t &config, context_t &context) {
+    levenberg(config, context);
+
+    // solve A @ dx = b for dx
+    batched_gesv(config, context);
+    Kokkos::fence();
+
+    debug_state(config, context);
+
+    // update x
+    backtrack(config, context);
+    Kokkos::fence();
+    update_weights(config, context);
+    Kokkos::fence();
 }

@@ -17,7 +17,7 @@ struct config_t {
 
     double accept_tol = 1e-12;
 
-    bool use_backtrack = true;
+    // bool use_backtrack = true;
     bool use_levenberg = true;
 
     bool dump_equations = false;
@@ -47,7 +47,6 @@ struct context_t {
     Kokkos::View<double  **> dx;
     Kokkos::View<double  **> x_tmp;
     Kokkos::View<double   *> norms_last;
-    Kokkos::View<double   *> alphas;
     Kokkos::View<double   *> lambdas;
     Kokkos::View<uint8_t  *> accept;
     Kokkos::View<uint64_t *> ttl;
@@ -73,7 +72,6 @@ Kokkos::View<double  **> &b = context.b; \
 Kokkos::View<double  **> &dx = context.dx; \
 Kokkos::View<double  **> &x_tmp = context.x_tmp; \
 Kokkos::View<double   *> &norms_last = context.norms_last; \
-Kokkos::View<double   *> &alphas = context.alphas; \
 Kokkos::View<double   *> &lambdas = context.lambdas; \
 Kokkos::View<uint8_t  *> &accept = context.accept; \
 Kokkos::View<uint64_t *> &ttl = context.ttl;
